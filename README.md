@@ -2,7 +2,7 @@
 
 ## Synopsis
 
-The PCF implements `Monaco editor` in order to show text area field as a code editor.
+Code Editor PCF implements `Monaco editor` in order to show text area field as a code editor.
 
 ## Motivation
 
