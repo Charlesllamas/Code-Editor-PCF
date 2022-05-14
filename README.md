@@ -2,7 +2,7 @@
 
 ## Synopsis
 
-The PCF implements Monaco editor in order to show text area field as a code editor.
+The PCF implements `Monaco editor` in order to show text area field as a code editor.
 
 ## Motivation
 
@@ -26,7 +26,7 @@ The PCF implements Monaco editor in order to show text area field as a code edit
     npm run build
     ```
 
-2. Change directory to the Solution folder
+2. Change directory to the CodeEditorSolution folder
 
     ```bash
     cd CodeEditorSolution
@@ -51,9 +51,9 @@ The PCF implements Monaco editor in order to show text area field as a code edit
     "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\MSBuild\Current\Bin\MSBuild.exe" /p:configuration=Release
     ```
 6. The build should succeed.
-7. Locate the Solution folder you created and expand it.
+7. Locate the CodeEditorSolution folder and expand it.
 8. Expand the bin\debug folder.
-9. You should see the solution.zip file here.
+9. You should see the CodeEditorSolution.zip file here.
 
 The default package type is a Managed solution. If you want to export as Unmanaged (or Both), you can clear (or uncomment) the comment in the following section from your Solutions.cdsproj and edit the SolutionPackageType node accordingly:
 ```
