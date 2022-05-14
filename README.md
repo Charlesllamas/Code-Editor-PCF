@@ -1,6 +1,6 @@
 # Code-Editor/PCF
 
-![Code Editor PCF](https://user-images.githubusercontent.com/13281127/168441956-9532bd87-99d5-4973-90dd-e8e899228b71.png)
+![Code Editor PCF](https://user-images.githubusercontent.com/13281127/168442032-f3f678f1-6160-40de-875c-40ebd646c417.png)
 ## Synopsis
 
 Code Editor PCF implements `Monaco editor` in order to show text area field as a code editor.
