@@ -105,6 +105,8 @@ Languages with only basic syntax colorization:
 * R
 * Objective-C
 
+Go to the post [`Configure Code Editor PCF`](https://charlesllamas.pro/blog/0293c8ce-f707-406e-93dd-4e638b6aee2d) in order to get the configuration step by step.
+
 #### Notes
 `To run MSBuild, you need to have either Visual Studio or the Visual Studio Build Tools installed. You can install the build tools from the Visual Studio Downloads. To access MSBuild, you might need to add it to the path directory of your Windows environment variables. For example, Visual Studio 2022 stores MSBuild at C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin. You can also use the Visual Studio Developer Command Prompt to access MSBuild, or run it by using the full qualified path ("C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"/t:build /restore).`
 

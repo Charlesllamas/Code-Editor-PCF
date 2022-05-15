@@ -11,6 +11,7 @@
     <Name>code-editor</Name>
     <ProjectGuid>5fa7bb1b-b341-4161-bda2-f2e69a8ccf79</ProjectGuid>
     <OutputPath>$(MSBuildThisFileDirectory)out\controls</OutputPath>
+    <PcfBuildMode>production</PcfBuildMode>
   </PropertyGroup>
 
   <PropertyGroup>
