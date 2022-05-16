@@ -1,7 +1,7 @@
 {
-  "name": "pcf-project",
+  "name": "code-editor-pcf",
   "version": "1.0.0",
-  "description": "Project containing your PowerApps Component Framework (PCF) control.",
+  "description": "Code Editor PCF implements Monaco editor in order to show text area field as a code editor.",
   "scripts": {
     "build": "pcf-scripts build",
     "clean": "pcf-scripts clean",
