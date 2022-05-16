@@ -19,6 +19,7 @@
     </external-service-usage>
     <type-group name="text">
         <type>SingleLine.TextArea</type>
+        <type>Multiple</type>
       </type-group>
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
     <property name="code" display-name-key="Code_Display_Key" description-key="Code_Desc_Key" of-type-group="text" usage="bound" required="true" />
