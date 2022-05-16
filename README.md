@@ -21,19 +21,27 @@ Code Editor PCF implements `Monaco editor` in order to show text area field as a
 ## Installation
 
 ### Create a solution file with Power Platform CLI
-
-1. Build the project
+1. Install the project dependencies
+   
+    ```bash
+    npm install
+    ```
+    If the console shows the version of npm is not compatible error message, update first the npm version by below command
+    ```bash
+    npm install -g npm@latest
+    ```
+2. Build the project
    
     ```bash
     npm run build
     ```
 
-2. Change directory to the CodeEditorSolution folder
+3. Change directory to the CodeEditorSolution folder
 
     ```bash
     cd CodeEditorSolution
     ```
-3. To generate your solution's zip file, use Microsoft Build Engine, or msbuild for short. You'll only need to use the /restore flag the first time the solution project is built. In every subsequent build, you'll need to run msbuild only. The path to your MSBuild.exe can be different depending on the version of Visual Studio you've installed on your machine.
+4. To generate your solution's zip file, use Microsoft Build Engine, or msbuild for short. You'll only need to use the /restore flag the first time the solution project is built. In every subsequent build, you'll need to run msbuild only. The path to your MSBuild.exe can be different depending on the version of Visual Studio you've installed on your machine.
    ```bash
     "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\MSBuild\Current\Bin\MSBuild.exe" /t:build /restore
     ```
@@ -41,10 +49,10 @@ Code Editor PCF implements `Monaco editor` in order to show text area field as a
     ```bash
     "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\MSBuild\Current\Bin\MSBuild.exe" /p:configuration=Release
     ```
-4. The build should succeed.
-5. Locate the CodeEditorSolution folder and expand it.
-6. Expand the bin\Debug folder or bin\Release for production.
-7. You should see the CodeEditorSolution.zip file here.
+5. The build should succeed.
+6. Locate the CodeEditorSolution folder and expand it.
+7. Expand the bin\Debug folder or bin\Release for production.
+8. You should see the CodeEditorSolution.zip file here.
 
 The default package type is a Managed solution. If you want to export as Unmanaged (or Both), you can clear (or uncomment) the comment in the following section from your Solutions.cdsproj and edit the SolutionPackageType node accordingly:
 ```
