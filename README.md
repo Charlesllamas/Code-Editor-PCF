@@ -14,6 +14,7 @@ Code Editor PCF implements `Monaco editor` in order to show text area field as a
 #### Contents
 
 * [Installation](#installation)
+* [Configuration](#configuration)
 * [Notes](#notes)
 * [License](#License)
 
@@ -32,18 +33,7 @@ Code Editor PCF implements `Monaco editor` in order to show text area field as a
     ```bash
     cd CodeEditorSolution
     ```
-
-3. Initialize your Dataverse solution project with the following command
-
-    ```bash
-    pac solution init --publisher-name mslearn --publisher-prefix msl
-    ```
-4. Inform your solution project its components will be added during the build
-
-    ```bash
-    pac solution add-reference --path ..
-    ```
-5. To generate your solution's zip file, use Microsoft Build Engine, or msbuild for short. You'll only need to use the /restore flag the first time the solution project is built. In every subsequent build, you'll need to run msbuild only. The path to your MSBuild.exe can be different depending on the version of Visual Studio you've installed on your machine.
+3. To generate your solution's zip file, use Microsoft Build Engine, or msbuild for short. You'll only need to use the /restore flag the first time the solution project is built. In every subsequent build, you'll need to run msbuild only. The path to your MSBuild.exe can be different depending on the version of Visual Studio you've installed on your machine.
    ```bash
     "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\MSBuild\Current\Bin\MSBuild.exe" /t:build /restore
     ```
@@ -51,10 +41,10 @@ Code Editor PCF implements `Monaco editor` in order to show text area field as a
     ```bash
     "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\MSBuild\Current\Bin\MSBuild.exe" /p:configuration=Release
     ```
-6. The build should succeed.
-7. Locate the CodeEditorSolution folder and expand it.
-8. Expand the bin\debug folder.
-9. You should see the CodeEditorSolution.zip file here.
+4. The build should succeed.
+5. Locate the CodeEditorSolution folder and expand it.
+6. Expand the bin\Debug folder or bin\Release for production.
+7. You should see the CodeEditorSolution.zip file here.
 
 The default package type is a Managed solution. If you want to export as Unmanaged (or Both), you can clear (or uncomment) the comment in the following section from your Solutions.cdsproj and edit the SolutionPackageType node accordingly:
 ```
@@ -70,6 +60,8 @@ For more information please check the below links:
 * [`Import components into model-driven apps`](https://docs.microsoft.com/en-us/power-apps/developer/component-framework/import-custom-controls)
 
 ## Configuration
+Go to the post [`Configure Code Editor PCF`](https://charlesllamas.pro/blog/0293c8ce-f707-406e-93dd-4e638b6aee2d) in order to get the configuration step by step.
+
 The code editor component has a property named `Language` that accept the below lenguage modes: 
 
 Languages that have rich IntelliSense and validation:
@@ -104,8 +96,6 @@ Languages with only basic syntax colorization:
 * SASS
 * R
 * Objective-C
-
-Go to the post [`Configure Code Editor PCF`](https://charlesllamas.pro/blog/0293c8ce-f707-406e-93dd-4e638b6aee2d) in order to get the configuration step by step.
 
 #### Notes
 `To run MSBuild, you need to have either Visual Studio or the Visual Studio Build Tools installed. You can install the build tools from the Visual Studio Downloads. To access MSBuild, you might need to add it to the path directory of your Windows environment variables. For example, Visual Studio 2022 stores MSBuild at C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin. You can also use the Visual Studio Developer Command Prompt to access MSBuild, or run it by using the full qualified path ("C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"/t:build /restore).`
