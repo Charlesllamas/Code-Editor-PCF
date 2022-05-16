@@ -22,7 +22,7 @@ Code Editor PCF implements `Monaco editor` in order to show text area field as a
 
 ### Create a solution file with Power Platform CLI
 
-1. Build then project
+1. Build the project
    
     ```bash
     npm run build

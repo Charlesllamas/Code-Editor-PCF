@@ -1,6 +1,6 @@
 {
   "name": "code-editor-pcf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Code Editor PCF implements Monaco editor in order to show text area field as a code editor.",
   "scripts": {
     "build": "pcf-scripts build",
