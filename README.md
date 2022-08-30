@@ -68,7 +68,7 @@ For more information please check the below links:
 * [`Import components into model-driven apps`](https://docs.microsoft.com/en-us/power-apps/developer/component-framework/import-custom-controls)
 
 ## Configuration
-Go to the post [`Configure Code Editor PCF`](https://charlesllamas.pro/blog/0293c8ce-f707-406e-93dd-4e638b6aee2d) in order to get the configuration step by step.
+Go to the post [`Configure Code Editor PCF`]([https://charlesllamas.pro/blog/0293c8ce-f707-406e-93dd-4e638b6aee2d](https://charlesllamas.pro/blog/Configure-Code-Editor-PCF)) in order to get the configuration step by step.
 
 The code editor component has a property named `Language` that accept the below lenguage modes: 
 
