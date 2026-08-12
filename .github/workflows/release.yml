@@ -1,0 +1,101 @@
+name: Release
+
+# A pushed tag is the whole trigger. PCFHub's contract is that tagging a
+# component repository publishes a documented version on the hub with no manual
+# steps, and this workflow is the half of that contract living here: build,
+# pack both solution types, attach them to a GitHub Release, tell the hub.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and release'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Windows, not Linux. The solution is packed by msbuild through
+    # Microsoft.PowerApps.MSBuild.Solution, which is a .NET Framework toolchain
+    # — there is no Linux runner that can produce the zip.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - uses: microsoft/setup-msbuild@v2
+
+      # `npm ci` rather than `npm install`: the lockfile is what was tested, and
+      # a release is the worst moment to resolve a new transitive version.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the control
+        run: npm run build
+
+      # Both, because CodeEditorSolution.cdsproj sets SolutionPackageType=Both.
+      # /restore is only needed on a cold checkout, which every CI run is.
+      - name: Pack the solution
+        run: msbuild /t:build /restore /p:configuration=Release
+        working-directory: CodeEditorSolution
+
+      # Both files are attached under the names msbuild produces —
+      # `CodeEditorSolution_managed.zip` and `CodeEditorSolution.zip` — and
+      # `pcfhub.json` matches those exact names. Renaming the unmanaged one to
+      # say "unmanaged" would read better and would silently stop the hub
+      # recognising the unmanaged asset on v1.0.0 through v1.0.2, whose
+      # published assets cannot be renamed after the fact. Consistency across
+      # every release wins over a clearer filename on the newest one.
+      - name: Collect the artifacts
+        shell: pwsh
+        run: |
+          $out = 'CodeEditorSolution/bin/Release'
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          Copy-Item "$out/CodeEditorSolution_managed.zip" artifacts/
+          Copy-Item "$out/CodeEditorSolution.zip" artifacts/
+
+      # The version in the control manifest is what the platform upgrades on. A
+      # tag that disagrees with it produces a release the hub records under one
+      # number and Dataverse installs as another, and nobody notices until an
+      # upgrade silently does nothing.
+      - name: Check the tag matches the control manifest
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}" -replace '^v', ''
+          $xml = [xml](Get-Content CodeEditor/ControlManifest.Input.xml)
+          $manifest = $xml.manifest.control.version
+          if ($tag -ne $manifest) {
+            throw "Tag $tag does not match ControlManifest version $manifest."
+          }
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: |
+            artifacts/CodeEditorSolution_managed.zip
+            artifacts/CodeEditorSolution.zip
+
+      # Nothing notifies PCFHub from here, on purpose. Publishing the release
+      # above fires GitHub's own `release` webhook, which the hub authenticates
+      # by HMAC over the raw delivery body — a curl from this workflow could not
+      # produce that signature, and adding a second unauthenticated endpoint to
+      # accept one would be a worse trade than the hourly sweep that already
+      # backs the webhook up.
+      #
+      # So: configure the webhook once on this repository (Settings → Webhooks,
+      # payload URL `https://pcfhub.dev/webhooks/github`, content type
+      # `application/json`, secret shared with the hub, events: Releases and
+      # Pushes) and a tag publishes within seconds. Without it, within the hour.

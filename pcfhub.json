@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+
+  "slug": "pcf-code-editor",
+  "name": "Code Editor",
+  "tagline": "Edit JSON, XML and other code in a multiline text column, with Monaco.",
+  "category": "text-editors",
+  "tags": ["react", "typescript", "localised", "model-driven"],
+
+  "control": {
+    "namespace": "PCF",
+    "constructor": "CodeEditor",
+    "type": "field",
+    "framework": "standard",
+    "manifestPath": "CodeEditor/ControlManifest.Input.xml"
+  },
+
+  "links": {
+    "homepage": "https://github.com/Charlesllamas/Code-Editor-PCF",
+    "support": "https://github.com/Charlesllamas/Code-Editor-PCF/issues",
+    "license": "MIT"
+  },
+
+  "docs": {
+    "path": "docs"
+  },
+
+  "release": {
+    "artifacts": {
+      "managed_solution": "CodeEditorSolution_managed.zip",
+      "unmanaged_solution": "CodeEditorSolution.zip"
+    }
+  },
+
+  "demo": {
+    "fidelity": "none"
+  }
+}
