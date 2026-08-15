@@ -57,6 +57,14 @@ jobs:
       # recognising the unmanaged asset on v1.0.0 through v1.0.2, whose
       # published assets cannot be renamed after the fact. Consistency across
       # every release wins over a clearer filename on the newest one.
+      #
+      # The demo bundle is the same `bundle.js` `npm run build` already
+      # produces under out/controls/ — a standard pcf-scripts build calls
+      # window.ComponentFramework.registerControl if present, which is the
+      # exact hook PCFHub's demo harness boots against, so there is nothing
+      # PCFHub-specific to build here. It is attached under its own name
+      # (rather than msbuild's convention) because PCFHub's ingestion matches
+      # a demo_bundle release asset literally named "bundle.js" by default.
       - name: Collect the artifacts
         shell: pwsh
         run: |
@@ -64,6 +72,12 @@ jobs:
           New-Item -ItemType Directory -Force artifacts | Out-Null
           Copy-Item "$out/CodeEditorSolution_managed.zip" artifacts/
           Copy-Item "$out/CodeEditorSolution.zip" artifacts/
+
+          $bundle = Get-ChildItem -Path out/controls -Filter bundle.js -Recurse | Select-Object -First 1
+          if (-not $bundle) {
+            throw "npm run build did not produce a bundle.js under out/controls."
+          }
+          Copy-Item $bundle.FullName artifacts/bundle.js
 
       # The version in the control manifest is what the platform upgrades on. A
       # tag that disagrees with it produces a release the hub records under one
@@ -87,6 +101,7 @@ jobs:
           files: |
             artifacts/CodeEditorSolution_managed.zip
             artifacts/CodeEditorSolution.zip
+            artifacts/bundle.js
 
       # Nothing notifies PCFHub from here, on purpose. Publishing the release
       # above fires GitHub's own `release` webhook, which the hub authenticates

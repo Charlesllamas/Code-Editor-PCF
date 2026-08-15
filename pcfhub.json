@@ -33,6 +33,7 @@
   },
 
   "demo": {
-    "fidelity": "none"
+    "fidelity": "full",
+    "bundle": "out/controls/PCF.CodeEditor/bundle.js"
   }
 }
