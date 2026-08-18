@@ -1,9 +1,7 @@
 name: Build
 
 # Every push and pull request, not only tags. release.yml runs on a tag alone,
-# which meant a break could sit on main for days and only surface while somebody
-# was waiting to ship. The bundled-Monaco work found a failure that reproduced
-# *only* in a production build — see the buildMode step below.
+# which meant a break could sit on main until somebody tried to ship.
 on:
   push:
     branches: [main]
@@ -33,34 +31,38 @@ jobs:
       - name: Build the control
         run: npm run build
 
-      # A development build tolerates things a production build does not. This
-      # control cannot be bundled without `module.parser.javascript.worker =
-      # false` in webpack.config.js, and without it a production build fails
-      # with "RuntimeIdRuntimeModule must be in a single runtime" while the
-      # development build succeeds and quietly emits unusable worker chunks.
-      # Building both is the only way that stays caught.
-      - name: Build the control (production)
-        run: npx pcf-scripts build --buildMode production
+      # Packing on every push, not only on a tag. A solution that only fails to
+      # pack at release time fails while somebody is waiting to ship it, and the
+      # cause is usually a change made days earlier.
+      #
+      # This is also the only step that builds the control the way it ships:
+      # code-editor.pcfproj sets PcfBuildMode=production, so msbuild rebuilds
+      # into out/controls and overwrites what `npm run build` left there. The
+      # distinction matters for this control — it cannot be bundled without
+      # `module.parser.javascript.worker = false` in webpack.config.js, and
+      # without that a production build fails with "RuntimeIdRuntimeModule must
+      # be in a single runtime" while the development build above succeeds and
+      # quietly emits unusable worker chunks.
+      - name: Pack the solution
+        run: msbuild /t:build /restore /p:configuration=Release
+        working-directory: CodeEditorSolution
 
-      # The bundle is a single web resource and Dataverse rejects one larger
-      # than 5 MB by default. Monaco puts this control close enough to that
-      # ceiling that an added grammar or language service could cross it, and
-      # the failure would otherwise appear as a solution import error in
-      # somebody's environment rather than here.
+      # A control is served as a single web resource, and Dataverse rejects one
+      # larger than 5 MB by default. Monaco puts this control within about
+      # 330 KB of that ceiling, so an added grammar or language service could
+      # cross it — and the failure would otherwise appear as a solution import
+      # error in somebody's environment rather than here.
+      #
+      # After the pack, because that is the step that writes the production
+      # bundle.
       - name: Check the bundle fits a default environment
         shell: pwsh
         run: |
           $limit = 5242880
           $bundle = Get-ChildItem out/controls -Filter bundle.js -Recurse | Select-Object -First 1
-          if (-not $bundle) { throw "No bundle.js under out/controls." }
+          if (-not $bundle) { throw "No bundle.js under out/controls after the pack." }
+
           Write-Host "bundle.js is $($bundle.Length) bytes (limit $limit)"
           if ($bundle.Length -gt $limit) {
-            throw "bundle.js is $($bundle.Length) bytes, over the $limit default Dataverse web resource limit."
+            throw "bundle.js is $($bundle.Length) bytes, over the $limit byte default Dataverse web resource limit."
           }
-
-      # Packing on every push, not only on a tag. A solution that only fails to
-      # pack at release time fails while somebody is waiting to ship it, and the
-      # cause is usually a change made days earlier.
-      - name: Pack the solution
-        run: msbuild /t:build /restore /p:configuration=Release
-        working-directory: CodeEditorSolution
