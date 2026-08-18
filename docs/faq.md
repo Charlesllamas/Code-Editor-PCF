@@ -8,36 +8,65 @@ order: 7
 
 ## The editor is blank. What happened?
 
-Almost always the CDN. Monaco is fetched from `cdn.jsdelivr.net` at runtime
-rather than bundled into the solution, so a network that blocks it leaves the
-control with nothing to render and no message. Open the browser console on the
-form — a failed request to jsDelivr is the confirmation.
+It is no longer the CDN — the editor is bundled into the solution and the
+control makes no external requests. Check the browser console on the form for a
+script error, and confirm the solution imported cleanly; a `bundle.js` that
+exceeded the environment's web resource size limit fails at import rather than
+at runtime.
+
+If you are on a release before the bundled build, the answer is different: those
+versions fetched Monaco from `cdn.jsdelivr.net` and rendered nothing when that
+host was unreachable. Upgrading is the fix.
+
+## Why is my language showing as plain text?
+
+Either it is not one of the fourteen bundled languages, or the identifier does
+not match. The control accepts Monaco's language ids and a handful of common
+aliases — `DAX`, `M`, `yml`, `T-SQL`, `C#`, `py`, `js` and `ts` all resolve.
+Anything it does not recognise falls back to plain text rather than erroring.
+
+See [Installation](installation) for the full list of accepted values.
+
+## Why is there no red underline on my broken JSON?
+
+Validation runs in a Monaco web worker, and Power Apps serves a code component
+as a single file with no way to serve worker files beside it. Colouring, bracket
+matching and folding all work; validation and completion do not. See
+[Limitations](limitations).
 
 ## The editor takes up the whole screen. Can I make it smaller?
 
-Not through a property. The height is fixed at 90% of the viewport in the control
-itself. Give the column a section, ideally a tab, of its own. If a shorter editor
-matters more than staying on the released build, it is a one-line change in
-`CodeEditor/components/Editor.tsx`.
+That was the old behaviour — the height was hardcoded to 90% of the viewport.
+The control now sizes itself from what the form allocates it, falling back to
+500 pixels when the form allocates nothing. In a canvas app it matches the box
+you draw.
 
 ## I changed the record in my gallery and the editor did not update.
 
-Expected, and worth understanding before you save: Monaco receives the value as
-`defaultValue`, which it reads at mount and ignores afterwards. The editor is
-still showing the previous record's document, and saving writes that text over
-the new record. See [Canvas apps](canvas) for the remount workaround.
+That is fixed. The control now writes the bound value into the editor whenever
+it changes underneath.
+
+One exception, by design: it will not do that while your cursor is in the
+editor, because the platform reports the value back asynchronously and writing
+it mid-edit would reset your cursor on every keystroke. Click out of the editor
+and the value resynchronises.
 
 ## Why is the editor writable on a read-only column?
 
-The control does not check `context.mode.isControlDisabled`. The platform still
-refuses the write, so the data is safe — but the user is allowed to type into it
-first. Do not use this control where the form is what enforces read-only.
+It should not be. The control reads `context.mode.isControlDisabled` and the
+column's field-level security, and renders read-only when either says so. If you
+are seeing an editable control on a locked column, that is worth
+[reporting](https://github.com/Charlesllamas/Code-Editor-PCF/issues) — include
+whether the lock comes from the form, a business rule or field security.
+
+Older releases did not check any of this.
 
 ## Can it validate the JSON before saving?
 
-It will underline a syntax error as you type, but it cannot stop the save — the
-component framework gives a control no way to cancel one. Validation that has to
-hold belongs in a synchronous plugin or a business rule.
+No, on two counts. The component framework gives a control no way to cancel a
+save, and the language workers that would produce the error in the first place
+cannot run. Validation that has to hold belongs in a synchronous plugin or a
+business rule.
 
 ## Why is my column not offered when I add the control?
 
@@ -46,10 +75,13 @@ the **Text Area** format. A plain single-line text column will not appear.
 
 ## Which languages are supported?
 
-Everything Monaco ships a grammar for. TypeScript, JavaScript, JSON, HTML, CSS,
-LESS and SCSS get full IntelliSense and validation; roughly thirty more,
-including XML, C#, SQL, PowerShell and Markdown, get syntax colouring. See
-[Installation](installation) for the identifiers.
+JSON, XML, SQL, YAML, Power Query M, DAX, Markdown, PowerShell, C#, Python, CSS,
+HTML, JavaScript and TypeScript. Colouring only — see the validation question
+above.
+
+That is fourteen of the roughly eighty grammars Monaco ships. The list is a
+curated choice rather than a limit; [Limitations](limitations) covers how to add
+one.
 
 ## Can I change the theme?
 

@@ -70,40 +70,34 @@ For more information please check the below links:
 ## Configuration
 Go to the post [`Configure Code Editor PCF`](https://charlesllamas.pro/blog/Configure-Code-Editor-PCF) in order to get the configuration step by step.
 
-The code editor component has a property named `Language` that accept the below lenguage modes: 
+The code editor component has a property named `Language` that accepts the
+below language modes. Monaco is bundled into the control, so this list is the
+whole of it — anything else renders as plain text.
 
-Languages that have rich IntelliSense and validation:
-
-* TypeScript
-* JavaScript
-* CSS
-* LESS
-* SCSS
 * JSON
-* HTML
-
-Languages with only basic syntax colorization:
 * XML
-* PHP
-* C#
-* C++
-* Razor
+* SQL
+* YAML
+* Power Query M (`powerquery`)
+* DAX (`msdax`)
 * Markdown
-* Diff
-* Java
-* VB
-* CoffeeScript
-* Handlebars
-* Batch
-* Pug
-* F#
-* Lua
-* Powershell
+* PowerShell
+* C# (`csharp`)
 * Python
-* Ruby
-* SASS
-* R
-* Objective-C
+* CSS
+* HTML
+* JavaScript
+* TypeScript
+
+Common aliases resolve to the ids above and matching is case-insensitive:
+`DAX`, `M`, `Power Query`, `yml`, `T-SQL`, `C#`, `ps1`, `md`, `py`, `js`, `ts`.
+
+> **No IntelliSense or validation.** Monaco runs those in web workers, and Power
+> Apps serves a code component as a single JavaScript file with no way to serve
+> worker files beside it. Syntax colouring, bracket matching, folding and find
+> all work; completion and error underlines do not — including for JavaScript
+> and TypeScript, which are colouring-only here. See
+> [docs/limitations.md](docs/limitations.md).
 
 #### Notes
 `To run MSBuild, you need to have either Visual Studio or the Visual Studio Build Tools installed. You can install the build tools from the Visual Studio Downloads. To access MSBuild, you might need to add it to the path directory of your Windows environment variables. For example, Visual Studio 2022 stores MSBuild at C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin. You can also use the Visual Studio Developer Command Prompt to access MSBuild, or run it by using the full qualified path ("C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"/t:build /restore).`

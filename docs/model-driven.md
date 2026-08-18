@@ -9,21 +9,25 @@ order: 3
 This is the control's home. It binds to a text column on a form, and everything
 below assumes a model-driven form unless it says otherwise.
 
-## Sizing, and why it is what it is
+## Sizing
 
-The editor renders at `height: 90vh` — ninety percent of the browser viewport,
-regardless of what the form allocates. This is baked into the control and there
-is no property for it.
+The control asks the platform to report container resizes and sizes the editor
+from the width and height the form allocates it.
 
-The practical consequence: give the column a **section of its own**, ideally on
-a dedicated tab. Placing it inline among other fields produces a form where one
-column occupies the whole screen and everything after it is below the fold.
+Model-driven forms often allocate no explicit height, and in that case the
+editor falls back to **500 pixels**. That is a constant in the control, not a
+property, so if it is the wrong height for your form the answer is a section
+sized to suit it.
 
 :::callout{type=info}
-If a shorter editor matters more to you than anything else here, the height is a
-one-line change in `CodeEditor/components/Editor.tsx` and the repository builds
-both solution types. Forking for it is a legitimate answer.
+Earlier releases rendered at `height: 90vh` regardless of what the form
+allocated, which is what made a dedicated tab mandatory. That is fixed — the
+control now stays inside its box, and the scrollbar tracks the content rather
+than the viewport.
 :::
+
+Giving the column a section of its own still reads better for a document-sized
+value, but it is now a layout preference rather than a workaround.
 
 ## Saving
 
@@ -40,35 +44,39 @@ state tracks what is in the editor. Two consequences worth knowing:
 :::callout{type=danger}
 If the column feeds an integration that will fail on malformed input, validate it
 somewhere that can actually stop the save — a synchronous plugin on the `Update`
-message, or a business rule. Relying on the red squiggle to have been noticed is
-relying on the user.
+message, or a business rule.
+
+Do not rely on the user noticing a red squiggle: the bundled build has no
+validation at all, so there is no squiggle to notice. See
+[Limitations](limitations).
 :::
 
-## Read-only columns are still editable
+## Read-only columns
 
-The control does not read `context.mode.isControlDisabled`, so a column that is
-read-only on the form, locked by a business rule, or disabled for the user's
-security role still renders an editable Monaco instance.
+The control reads `context.mode.isControlDisabled` and the bound column's
+field-level security, and renders a read-only editor when either indicates the
+value cannot be written. A column locked by the form, by a business rule, or by
+the user's security role gets an editor that can be read, scrolled and copied
+from, but not typed into.
 
-Typing into it changes the value the control reports, and the platform then
-refuses the write — so nothing is corrupted, but the user has been allowed to do
-work that is silently discarded. Do not put this control on a column you rely on
-the form to protect.
+Releases before the bundled build did not check any of this and rendered an
+editable editor over a locked column.
 
-## The value is read once, at mount
+## Values changing while the form is open
 
-Monaco is given the column's value as `defaultValue`, which it reads when the
-editor is created and never again. On a normal model-driven form that is
-invisible: opening a record mounts the control with that record's value.
+If something changes the column while the form is open — a workflow writing
+back, or another control calling `setValue` — the editor picks the new value up.
 
-It becomes visible when something changes the column while the form is open — a
-workflow writing back, or another control's `setValue`. The editor keeps showing
-what it was given, and a save then writes the stale text over the new value.
-Reloading the form resynchronises it.
+The one exception is deliberate: it will not overwrite the editor while the
+cursor is inside it. The platform reports the bound value back asynchronously,
+so during typing it is routinely a keystroke stale, and writing it back would
+reset the cursor to the top of the document on every key press. A change
+arriving while somebody is mid-edit is therefore dropped rather than applied.
 
 ## Field security
 
-Field-level security is honoured because the platform never sends the value to a
-control the user cannot read. The editor renders empty in that case, which is
-indistinguishable from an empty column; if that distinction matters on your form,
-a separate read-only indicator column is the usual workaround.
+Field-level security is honoured twice over: the platform never sends the value
+to a control the user cannot read, and the control renders read-only when the
+column is not editable. A user without read access sees an empty editor, which
+is indistinguishable from an empty column; if that distinction matters on your
+form, a separate indicator column is the usual workaround.

@@ -29,12 +29,31 @@ editor is the wrong shape for a value that short.
 
 ## The language property
 
-`language` is a required input string, passed to Monaco as `defaultLanguage`
-after being lowercased. It has no default in the manifest; the control falls
-back to `json` if the platform hands it a null.
+`language` is a required input string. The control lowercases it, resolves a
+small set of aliases, and checks the result against the grammars compiled into
+the bundle:
 
-Both properties are read when the editor mounts and not afterwards. See
-[Limitations](limitations).
+| Input | Resolves to |
+|---|---|
+| `DAX`, `MSDAX` | `msdax` |
+| `M`, `Power Query` | `powerquery` |
+| `yml` | `yaml` |
+| `T-SQL`, `TSQL` | `sql` |
+| `C#`, `cs` | `csharp` |
+| `ps1` | `powershell` |
+| `md` | `markdown` |
+| `py` | `python` |
+| `js`, `node`, `ecmascript` | `javascript` |
+| `ts` | `typescript` |
+
+An unrecognised value resolves to `plaintext` rather than raising an error, so a
+misconfigured property shows up as an uncoloured document. A null hands back
+`json`, which is the control's default.
+
+Both properties are live. Changing either updates the open editor — the language
+re-colours the current document in place, and a changed value is written in
+unless the cursor is currently inside the editor. See [Limitations](limitations)
+for why that exception exists.
 
 ## Localisation
 
@@ -55,11 +74,16 @@ designer. Monaco's own interface is not localised by these.
 </external-service-usage>
 ```
 
-:::callout{type=warning}
-This declaration is what keeps the control out of the premium classification, and
-it does not describe what the control does at runtime: `@monaco-editor/react`
-fetches the editor from `cdn.jsdelivr.net` on first render. Treat the control as
-requiring outbound browser access to that host when you assess it.
+This declaration is accurate: Monaco is compiled into `bundle.js` and the control
+makes no outbound requests at runtime. It is also what keeps the control out of
+the premium classification.
+
+:::callout{type=info}
+In releases before the bundled build this declaration was wrong —
+`@monaco-editor/react` fetched the editor from `cdn.jsdelivr.net` on first
+render, so the control did depend on an external host despite declaring
+otherwise. If you are assessing an older version, treat it as requiring outbound
+access to that host.
 :::
 
 There is no `feature-usage` block. The control uses neither the Web API nor any

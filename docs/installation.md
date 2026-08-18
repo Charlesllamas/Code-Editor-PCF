@@ -17,18 +17,19 @@ customise the control in. Import the managed one everywhere else — an unmanage
 solution cannot be cleanly uninstalled, and a control is not something you want
 permanently welded into a production environment.
 
-::download{kind=unmanaged_solution}
-
 :::callout{type=info}
 Importing a solution needs the System Customizer or System Administrator role.
 For a canvas app you also have to enable code components on the app itself — see
 [Canvas apps](canvas).
 :::
 
-:::callout{type=warning}
-Before you roll this out: the control fetches Monaco from `cdn.jsdelivr.net` at
-runtime. Confirm your users' browsers can reach that host, on a representative
-network, before the form goes live. See [Limitations](limitations).
+::download{kind=unmanaged_solution}
+
+:::callout{type=info}
+The control makes no external requests — Monaco is compiled into the solution —
+so there is no CDN or firewall prerequisite. The trade is size: `bundle.js` is
+about 4.9 MB against a default Dataverse limit of 5 MB. It imports into a default
+environment as shipped, but leaves little headroom if you fork and extend it.
 :::
 
 ## Add it to a model-driven form
@@ -39,9 +40,10 @@ network, before the form goes live. See [Limitations](limitations).
 4. Set the **Language** property — see [Configuration](#configuration) below.
 5. Choose which form factors the control applies to, then save and publish.
 
-Put the column in a section of its own. The editor renders at 90% of the viewport
-height and will otherwise push everything below it off the screen — see
-[Model-driven apps](model-driven).
+The editor sizes itself to the space the form allocates, falling back to 500
+pixels tall when the form allocates nothing. Giving the column a section of its
+own still reads best for a document, but it is no longer required to stop the
+control swallowing the page — see [Model-driven apps](model-driven).
 
 ## Configuration
 
@@ -50,18 +52,33 @@ The control takes two properties.
 ::props-table{kind=input}
 
 `Code` binds to the column itself and must be a **Multiple Lines of Text** or
-**Single Line of Text (Text Area)** column. `Language` is the Monaco language
-identifier and decides which grammar the editor loads.
+**Single Line of Text (Text Area)** column. `Language` decides which grammar the
+editor loads.
 
-```text title="Language values with full IntelliSense"
-typescript  javascript  json  html  css  less  scss
+```text title="Accepted Language values"
+json    xml     sql     yaml    powerquery   msdax
+markdown    powershell    csharp    python    css    html
+javascript    typescript
 ```
 
-```text title="Language values with syntax colouring only"
-xml   php     csharp  cpp     razor   markdown  diff
-java  vb      coffee  handlebars      bat       pug
-fsharp  lua   powershell  python  ruby  sass  r  objective-c
+Common aliases are accepted too and resolve to the ids above:
+
+```text title="Aliases"
+DAX -> msdax        M, Power Query -> powerquery    yml -> yaml
+T-SQL, TSQL -> sql  C#, cs -> csharp                ps1 -> powershell
+md -> markdown      py -> python                    ts -> typescript
+js, node, ecmascript -> javascript
 ```
+
+Matching is case-insensitive. Anything unrecognised renders as plain text rather
+than failing — so a typo shows up as an uncoloured document, not an error.
+
+:::callout{type=warning}
+This list is the whole of it. Java, PHP, C++, Ruby and the rest of Monaco's
+eighty grammars are not bundled, and none of the fourteen get IntelliSense or
+validation. [Limitations](limitations) explains the reasoning — and how to add a
+language if you need one.
+:::
 
 ## Build it yourself
 
@@ -77,3 +94,10 @@ msbuild /t:build /restore /p:configuration=Release
 The zips land in `CodeEditorSolution/bin/Release`. `msbuild` comes from Visual
 Studio or the standalone Visual Studio Build Tools; the Developer Command Prompt
 is the least painful way to get it on `PATH`.
+
+:::callout{type=info}
+The build needs `featureconfig.json` and `webpack.config.js` at the repository
+root. They enable pcf-scripts' custom-webpack support, which is what lets
+Monaco's stylesheets and icon font be compiled into the bundle. Building without
+them fails.
+:::
