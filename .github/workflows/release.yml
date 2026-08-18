@@ -31,10 +31,34 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: npm
 
       - uses: microsoft/setup-msbuild@v2
+
+      # The version in the control manifest is what the platform upgrades on. A
+      # tag that disagrees with it produces a release the hub records under one
+      # number and Dataverse installs as another, and nobody notices until an
+      # upgrade silently does nothing. Solution.xml carries its own version and
+      # is just as easy to forget — releasing 1.1.0 needed a bump in three files
+      # and only the control manifest used to be checked.
+      #
+      # Checked before anything is installed or built, so a mismatch costs
+      # seconds rather than a whole Windows pack.
+      - name: Check the tag matches the manifests
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}" -replace '^v', ''
+
+          $control = ([xml](Get-Content CodeEditor/ControlManifest.Input.xml)).manifest.control.version
+          if ($tag -ne $control) {
+            throw "Tag $tag does not match ControlManifest version $control."
+          }
+
+          $solution = ([xml](Get-Content CodeEditorSolution/src/Other/Solution.xml)).ImportExportXml.SolutionManifest.Version
+          if ($tag -ne $solution) {
+            throw "Tag $tag does not match Solution.xml version $solution."
+          }
 
       # `npm ci` rather than `npm install`: the lockfile is what was tested, and
       # a release is the worst moment to resolve a new transitive version.
@@ -79,19 +103,7 @@ jobs:
           }
           Copy-Item $bundle.FullName artifacts/bundle.js
 
-      # The version in the control manifest is what the platform upgrades on. A
-      # tag that disagrees with it produces a release the hub records under one
-      # number and Dataverse installs as another, and nobody notices until an
-      # upgrade silently does nothing.
-      - name: Check the tag matches the control manifest
-        shell: pwsh
-        run: |
-          $tag = "${{ github.event.inputs.tag || github.ref_name }}" -replace '^v', ''
-          $xml = [xml](Get-Content CodeEditor/ControlManifest.Input.xml)
-          $manifest = $xml.manifest.control.version
-          if ($tag -ne $manifest) {
-            throw "Tag $tag does not match ControlManifest version $manifest."
-          }
+          Get-ChildItem artifacts | ForEach-Object { Write-Host "attaching $($_.Name) ($($_.Length) bytes)" }
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
