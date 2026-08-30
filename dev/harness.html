@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Code Editor — dev harness</title>
+
+        <!--
+            A stand-in for a model-driven form.
+
+            Run `npm run build` first, then open this file. Reload after every
+            build.
+
+            **Why this exists.** `npm start` renders the control, but it cannot
+            put it in the states that matter here: a read-only column, a
+            container of a given size, a language the maker chose, or a value
+            handed down by the platform *after* the user has already typed one.
+            Each of those is a switch below.
+
+            **What it is not.** Every value on this page comes from this file.
+            It cannot tell you that a real form hands down what this hands down,
+            that a save persists anything, or that field-level security behaves
+            the way `SECURITY` below claims. Those belong in SPEC.md.
+
+            Self-contained on purpose: the fixture is inline and every path is
+            relative, so this works over `file://` with no server. The bundle is
+            large — Monaco is inside it — so the first load is not instant.
+        -->
+
+        <!--
+            No stylesheet to link: this control ships none. Monaco brings its own
+            and the container is sized from allocatedWidth/Height rather than by
+            CSS, which is unusual in this house and worth knowing before you go
+            looking for the file.
+        -->
+        <style>
+            body {
+                margin: 0;
+                padding: 24px;
+                font-family: 'Segoe UI', system-ui, sans-serif;
+                font-size: 14px;
+                background: #faf9f8;
+                color: #323130;
+            }
+
+            h1 {
+                font-size: 18px;
+                margin: 0 0 4px;
+            }
+
+            .harness-note {
+                margin: 0 0 24px;
+                color: #605e5c;
+            }
+
+            .harness-controls {
+                display: flex;
+                gap: 16px;
+                align-items: center;
+                flex-wrap: wrap;
+                margin-bottom: 24px;
+                padding: 12px 16px;
+                background: #fff;
+                border: 1px solid #edebe9;
+                border-radius: 4px;
+            }
+
+            .harness-controls label {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            h2 {
+                font-size: 14px;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: #605e5c;
+                margin: 32px 0 8px;
+            }
+
+            /*
+                The box the form gives the control. The control reads
+                `allocatedWidth` and `allocatedHeight` rather than measuring, so
+                this element's size and the numbers reported to it are set
+                together by `harness.js` — if they ever disagree, the bug is in
+                this page and not in the control.
+            */
+            .harness-surface {
+                background: #fff;
+                border: 1px solid #edebe9;
+                border-radius: 4px;
+                padding: 12px;
+                display: inline-block;
+            }
+
+            .harness-out {
+                margin: 0;
+                padding: 12px 16px;
+                background: #fff;
+                border: 1px solid #edebe9;
+                border-radius: 4px;
+                font-family: 'Cascadia Mono', Consolas, monospace;
+                font-size: 12px;
+                white-space: pre-wrap;
+                max-height: 200px;
+                overflow: auto;
+            }
+
+            .harness-badge {
+                font-weight: 400;
+                text-transform: none;
+                letter-spacing: 0;
+                color: #605e5c;
+            }
+        </style>
+    </head>
+
+    <body>
+        <h1>Code Editor — dev harness</h1>
+        <p class="harness-note">
+            A stand-in for a model-driven form. Run <code>npm run build</code>
+            first; reload after every build.
+        </p>
+
+        <div class="harness-controls">
+            <label>
+                Language
+                <select id="harness-language">
+                    <option value="json">json</option>
+                    <option value="xml">xml</option>
+                    <option value="javascript">javascript</option>
+                    <option value="sql">sql</option>
+                    <option value="plaintext">plaintext</option>
+                    <option value="nonsense">nonsense (unknown)</option>
+                </select>
+            </label>
+
+            <label>
+                Field-level security
+                <select id="harness-security">
+                    <option value="none">None (the usual case)</option>
+                    <option value="read-only">Read, no write</option>
+                </select>
+            </label>
+
+            <label>
+                <input type="checkbox" id="harness-disabled" />
+                Form read-only
+            </label>
+
+            <label>
+                Width
+                <input type="number" id="harness-width" value="720" min="200" max="1400" step="20" />
+            </label>
+
+            <label>
+                Height
+                <input type="number" id="harness-height" value="320" min="120" max="800" step="20" />
+            </label>
+
+            <button type="button" id="harness-empty">Clear the column</button>
+            <button type="button" id="harness-rerender">updateView again</button>
+        </div>
+
+        <div class="harness-surface" id="harness-surface">
+            <div id="harness-root"></div>
+        </div>
+
+        <h2>getOutputs() <span class="harness-badge" id="harness-notified"></span></h2>
+        <pre class="harness-out" id="harness-outputs"></pre>
+
+        <p class="harness-note" id="harness-status"></p>
+
+        <script src="harness.js"></script>
+        <script src="../out/controls/CodeEditor/bundle.js"></script>
+        <script>
+            window.__harnessStart();
+        </script>
+    </body>
+</html>

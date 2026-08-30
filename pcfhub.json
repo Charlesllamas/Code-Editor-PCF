@@ -25,6 +25,11 @@
   "docs": {
     "path": "docs"
   },
+  "media": {
+    "screenshots": [
+      "media/screenshot.png"
+    ]
+  },
   "release": {
     "artifacts": {
       "managed_solution": "CodeEditorSolution_managed.zip",

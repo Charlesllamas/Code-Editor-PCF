@@ -10,6 +10,8 @@ Code Editor replaces the plain textarea a multiline text column gets by default
 with the [Monaco editor](https://microsoft.github.io/monaco-editor/) — the same
 editor that runs inside Visual Studio Code.
 
+::image{src=media/screenshot.png alt="A JSON document in the Code Editor, with line numbers, syntax highlighting and indent guides" zoom}
+
 It exists because of a specific, common situation: a solution stores JSON or XML
 in a text column, and somebody eventually has to edit it. Without an editor that
 understands the format, that means counting braces in a box with no line
