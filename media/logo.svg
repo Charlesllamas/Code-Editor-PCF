@@ -1,0 +1,56 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- A code editor: the field this control replaces, with code in it.
+
+       The card is the multiline text column, and the mark inside is the one
+       thing that changes when this control is bound to it. Brackets and a slash
+       rather than lines of text, because indented lines on a card is what every
+       list, note and description mark already looks like; the glyph is the only
+       interior that says "this is code, not prose" at the size the hub shows it.
+
+       The ramp is the PCFHub mark's own, verbatim, so this sits in the family
+       rather than beside it. Declared in userSpaceOnUse and spanning the whole
+       96 canvas, so the card samples the part of the ramp it sits on and the
+       mark reads as one object lit from the top right.
+
+       Drawn for 32px, and the discarded attempts are why it looks like this.
+
+       Three lines of white text on the card, indented into a staircase, was the
+       obvious first answer and it reads as a paragraph: the indent is 10 units,
+       which is three pixels at 32, and three pixels of offset is not a language.
+       Adding a gutter rule beside it, then line-number dots, only put a third
+       weight into a card whose interior is thirteen pixels tall at 32; both
+       muddied into the first line of text.
+
+       The brackets were then tried without the slash, and that is the one worth
+       recording: two chevrons facing outward on a card is the COLLAPSE/EXPAND
+       control in every toolbar, and at 32 it read as one. The slash is not
+       decoration; it is the thing that makes the pair a language rather than a
+       direction. It was also tried at stroke 10 with the brackets pushed out to
+       20 and 76, which closes the gap to the left bracket's lower arm until the
+       two merge into a blob at 20px. Stroke 9, tips at 21 and 75, and the slash
+       pulled in to 42/54 keeps daylight on both sides down to 20px.
+
+       Two weights, one silhouette, and the only fragile detail is that daylight.
+
+       Note: no double hyphen may appear in this comment, or the whole document
+       fails to parse as XML. -->
+  <defs>
+    <linearGradient id="editor-ramp" x1="6" y1="82" x2="90" y2="14" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A684FF"/><stop offset="0.6" stop-color="#7C86FF"/><stop offset="1" stop-color="#00BCFF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- The field. -->
+  <rect x="6" y="10" width="84" height="76" rx="18" fill="url(#editor-ramp)"/>
+
+  <!-- The brackets. `stroke-linejoin="round"` matters at this weight: a mitred
+       join throws a spike off each tip and into the card's edge. -->
+  <path d="M34 34 L21 48 L34 62" stroke="#F8FAFC" stroke-width="9"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M62 34 L75 48 L62 62" stroke="#F8FAFC" stroke-width="9"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- The slash. Kept inside the brackets' vertical span so the mark stays a
+       glyph rather than three strokes that happen to share a card. -->
+  <path d="M54 29 L42 67" stroke="#F8FAFC" stroke-width="9" stroke-linecap="round"/>
+</svg>

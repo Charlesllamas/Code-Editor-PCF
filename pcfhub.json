@@ -26,6 +26,7 @@
     "path": "docs"
   },
   "media": {
+    "logo": "media/logo.png",
     "screenshots": [
       "media/screenshot.png"
     ]
