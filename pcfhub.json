@@ -8,7 +8,11 @@
     "typescript",
     "localised",
     "model-driven",
-    "monaco"
+    "canvas",
+    "monaco",
+    "json",
+    "xml",
+    "dark-mode"
   ],
   "control": {
     "namespace": "PCF",
@@ -28,7 +32,9 @@
   "media": {
     "logo": "media/logo.png",
     "screenshots": [
-      "media/screenshot.png"
+      "media/screenshot.png",
+      "media/screenshot-dark.png",
+      "media/screenshot-xml.png"
     ]
   },
   "release": {
@@ -39,6 +45,64 @@
   },
   "demo": {
     "fidelity": "full",
-    "bundle": "out/controls/CodeEditor/bundle.js"
+    "bundle": "out/controls/CodeEditor/bundle.js",
+    "styles": [
+      "out/controls/CodeEditor/css/CodeEditor.css"
+    ],
+    "presets": [
+      {
+        "slug": "default",
+        "name": "JSON, light",
+        "description": "A JSON document with validation on and a Format button in the strip beneath the editor.",
+        "props": {
+          "code": "{\n  \"publisher\": \"PCFHub\",\n  \"controls\": [\n    { \"name\": \"CodeEditor\", \"language\": \"json\", \"readOnly\": false },\n    { \"name\": \"Sparkline\", \"language\": \"xml\", \"readOnly\": true }\n  ],\n  \"notes\": \"Edited in a code component, saved to a multiline text column.\"\n}",
+          "language": "json",
+          "theme": "auto",
+          "height": 320,
+          "fitContent": false,
+          "validation": "on"
+        },
+        "isDefault": true
+      },
+      {
+        "slug": "faults",
+        "name": "Two faults",
+        "description": "A trailing comma and a comment: the first is named in the strip, both are marked in the editor, and Format still tidies what parses.",
+        "props": {
+          "code": "{\n  \"publisher\": \"PCFHub\",\n  \"controls\": [\n    { \"name\": \"CodeEditor\", \"language\": \"json\" },\n  ],\n  \"notes\": \"a trailing comma above, and a comment below\"\n  // not JSON\n}",
+          "language": "json",
+          "theme": "auto",
+          "height": 320,
+          "fitContent": false,
+          "validation": "on"
+        }
+      },
+      {
+        "slug": "dark",
+        "name": "Dark, fit to content",
+        "description": "Forced dark theme, and the editor sized to its document up to 400px rather than a fixed box.",
+        "props": {
+          "code": "{\n  \"publisher\": \"PCFHub\",\n  \"controls\": [\n    { \"name\": \"CodeEditor\", \"language\": \"json\", \"readOnly\": false },\n    { \"name\": \"Sparkline\", \"language\": \"xml\", \"readOnly\": true }\n  ],\n  \"notes\": \"Edited in a code component, saved to a multiline text column.\"\n}",
+          "language": "json",
+          "theme": "dark",
+          "height": 400,
+          "fitContent": true,
+          "validation": "on"
+        }
+      },
+      {
+        "slug": "xml",
+        "name": "XML",
+        "description": "An XML document; well-formedness is checked by the browser's own parser.",
+        "props": {
+          "code": "<solution name=\"CodeEditor\">\n  <control language=\"xml\" theme=\"auto\">\n    <property name=\"height\">320</property>\n  </control>\n</solution>",
+          "language": "xml",
+          "theme": "auto",
+          "height": 320,
+          "fitContent": false,
+          "validation": "on"
+        }
+      }
+    ]
   }
 }

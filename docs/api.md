@@ -47,8 +47,25 @@ the bundle:
 | `ts` | `typescript` |
 
 An unrecognised value resolves to `plaintext` rather than raising an error, so a
-misconfigured property shows up as an uncoloured document. A null hands back
-`json`, which is the control's default.
+misconfigured property shows up as an uncoloured document. A null or blank
+value hands back `json`, which is the control's default; releases before 1.2.0
+treated blank as plain text.
+
+## The 1.2.0 inputs
+
+All four are optional, so a form configured for 1.1.0 upgrades without a
+change: `theme` defaults to `auto`, `validation` to `on`, `fitContent`
+to off, and a blank `height` is the 500 pixels earlier releases hard-wired.
+
+| Property | Values | Where it applies |
+|---|---|---|
+| `theme` | `auto`, `light`, `dark` | Everywhere. `auto` follows the app where one is published, and is light where none is. |
+| `height` | pixels | Only where the host allocates no height — a model-driven form, usually. |
+| `fitContent` | on/off | Only where the host allocates no height. Grows with the document, up to `height`. |
+| `validation` | `on`, `off` | JSON and XML. `off` for a column that holds JSON with comments. |
+
+The strip beneath the editor is not a property; it shows the resolved language,
+the first fault when there is one, and **Format** for JSON.
 
 Both properties are live. Changing either updates the open editor — the language
 re-colours the current document in place, and a changed value is written in

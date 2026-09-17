@@ -1,30 +1,31 @@
 {
   "name": "code-editor-pcf",
-  "version": "1.1.0",
-  "description": "Code Editor PCF implements Monaco editor in order to show text area field as a code editor.",
+  "version": "1.2.0",
+  "description": "Edit JSON, XML and other code in a multiline text column, with Monaco.",
   "scripts": {
+    "check": "node scripts/check-template.mjs",
     "build": "pcf-scripts build",
     "clean": "pcf-scripts clean",
     "rebuild": "pcf-scripts rebuild",
     "start": "pcf-scripts start",
-    "refreshTypes": "pcf-scripts refreshTypes"
+    "refreshTypes": "pcf-scripts refreshTypes",
+    "lint": "eslint CodeEditor --ext .ts,.tsx",
+    "smoke": "node dev/smoke.js",
+    "harness": "node dev/serve.js"
   },
   "dependencies": {
+    "jsonc-parser": "^3.3.1",
     "monaco-editor": "^0.56.0"
   },
   "devDependencies": {
-    "@types/node": "^16.4",
-    "@types/powerapps-component-framework": "^1.3.0",
-    "@typescript-eslint/eslint-plugin": "^4.29.0",
-    "@typescript-eslint/parser": "^4.29.0",
-    "css-loader": "^7.1.4",
-    "eslint": "^7.32.0",
-    "eslint-plugin-import": "^2.23.4",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-promise": "^5.1.0",
-    "pcf-scripts": "^1",
-    "pcf-start": "^1",
-    "style-loader": "^4.0.0",
-    "typescript": "^4.3"
+    "@types/node": "^20.11.0",
+    "@types/powerapps-component-framework": "^1.3.18",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "pcf-scripts": "^1.51.1",
+    "pcf-start": "^1.51.1",
+    "style-loader": "^3.3.4",
+    "typescript": "^5.3.3"
   }
 }

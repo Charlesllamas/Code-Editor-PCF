@@ -15,6 +15,17 @@
 
     /* ------------------------------------------------------------- fixture */
 
+    var BROKEN = [
+        '{',
+        '  "publisher": "PCFHub",',
+        '  "controls": [',
+        '    { "name": "CodeEditor", "language": "json" },',
+        '  ],',
+        '  "notes": "a trailing comma above, and a comment below"',
+        '  // not JSON',
+        '}',
+    ].join('\n');
+
     var SAMPLE = [
         '{',
         '  "publisher": "PCFHub",',
@@ -41,6 +52,8 @@
 
     /* ------------------------------------------------------- host plumbing */
 
+    var STRINGS = {};
+
     var registered = null;
     var instance = null;
     var container = null;
@@ -60,12 +73,22 @@
     };
 
     function options() {
+        var pref = document.getElementById('harness-pref-height').value;
         return {
             language: document.getElementById('harness-language').value,
             security: document.getElementById('harness-security').value,
             disabled: document.getElementById('harness-disabled').checked,
             width: Number(document.getElementById('harness-width').value) || 720,
-            height: Number(document.getElementById('harness-height').value) || 320,
+            // -1 is what a model-driven form reports when it allocates nothing.
+            height: document.getElementById('harness-allocates').checked
+                ? (Number(document.getElementById('harness-height').value) || 320)
+                : -1,
+            theme: document.getElementById('harness-theme').value,
+            appTheme: document.getElementById('harness-app-theme').value,
+            // null is the blank property; the platform never hands down 0 for it.
+            prefHeight: pref === '' ? null : Number(pref),
+            fitContent: document.getElementById('harness-fit').checked,
+            validation: document.getElementById('harness-validation').value,
         };
     }
 
@@ -78,7 +101,22 @@
                     security: SECURITY[o.security],
                 },
                 language: { raw: o.language, type: 'SingleLine.Text' },
+                theme: { raw: o.theme, type: 'Enum' },
+                height: { raw: o.prefHeight, type: 'Whole.None' },
+                fitContent: { raw: o.fitContent, type: 'TwoOptions' },
+                validation: { raw: o.validation, type: 'Enum' },
             },
+
+            /*
+             * Withheld unless the app publishes one. A canvas app and the
+             * classic model-driven look hand down no `fluentDesignLanguage`
+             * at all, and `theme: auto` has to mean *light* there rather
+             * than throw -- which a stub that always supplied the object
+             * would never show.
+             */
+            fluentDesignLanguage: o.appTheme === 'none'
+                ? undefined
+                : { isDarkTheme: o.appTheme === 'dark', tokenTheme: {}, brand: {} },
 
             mode: {
                 isVisible: true,
@@ -100,9 +138,15 @@
                 allocatedHeight: o.height,
             },
 
+            /*
+             * The real English strings, read from the .resx the platform packs,
+             * so the strip reads as it will on a form. A key the file does not
+             * carry comes back as the key -- which is also what the platform
+             * does, and is how a missing translation shows itself.
+             */
             resources: {
                 getString: function (key) {
-                    return key;
+                    return Object.prototype.hasOwnProperty.call(STRINGS, key) ? STRINGS[key] : key;
                 },
             },
 
@@ -189,6 +233,9 @@
 
         var surface = document.getElementById('harness-surface');
         surface.style.width = o.width + 'px';
+        // A form section grows around its contents; this box does the same,
+        // so a fitContent editor visibly resizes the surface it sits in.
+        surface.style.height = 'auto';
 
         instance = new registered();
 
@@ -220,6 +267,12 @@
             'harness-disabled',
             'harness-width',
             'harness-height',
+            'harness-allocates',
+            'harness-theme',
+            'harness-app-theme',
+            'harness-pref-height',
+            'harness-fit',
+            'harness-validation',
         ].forEach(function (id) {
             document.getElementById(id).addEventListener('change', mount);
         });
@@ -234,12 +287,34 @@
             mount();
         });
 
+        // A document with two faults, handed down by the platform: the strip
+        // should name the first and count the second, and the squiggles land
+        // on the comma and the comment.
+        document.getElementById('harness-break').addEventListener('click', function () {
+            columnValue = BROKEN;
+            mount();
+        });
+
         // The cheapest way to catch work that belongs behind a comparison:
         // press it and watch whether the editor loses what was typed.
         document.getElementById('harness-rerender').addEventListener('click', rerender);
 
         status.textContent = 'Registered the control.';
 
-        mount();
+        fetch('../CodeEditor/strings/CodeEditor.1033.resx')
+            .then(function (r) { return r.text(); })
+            .then(function (xml) {
+                var doc = new DOMParser().parseFromString(xml, 'application/xml');
+                Array.prototype.forEach.call(doc.getElementsByTagName('data'), function (node) {
+                    var value = node.getElementsByTagName('value')[0];
+                    if (value) {
+                        STRINGS[node.getAttribute('name')] = value.textContent;
+                    }
+                });
+            })
+            .catch(function () {
+                status.textContent += ' Could not read the .resx; the strip shows keys.';
+            })
+            .then(mount);
     };
 })();

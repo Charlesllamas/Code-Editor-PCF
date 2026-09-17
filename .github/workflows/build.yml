@@ -23,33 +23,22 @@ jobs:
   build:
     uses: pcfhub/_template/.github/workflows/build-reusable.yml@v1
     with:
-      # This repository predates the template and was brought into the fold by
-      # adopt.mjs, which adds the hub contract but not scripts/ and not a dev
-      # rig. So three of the shared build's steps have nothing to run here:
+      # Every step runs here as of 1.2.0. Until then this file switched three
+      # of them off — check-template, lint and smoke — and the reasons are
+      # worth keeping because two of them were work and one was a decision:
       #
-      #   check-template  no scripts/check-template.mjs, so no placeholder gate
-      #   lint            no lint script in package.json
-      #   smoke           no dev/ directory, so no assertions at all
+      #   check-template  had no scripts/check-template.mjs — copied in.
+      #   lint            had no lint script and the stock pac-init ESLint
+      #                   config, which fails on `ComponentFramework` itself —
+      #                   replaced with the template's.
+      #   smoke           "not going away": Monaco reads `document` at module
+      #                   scope, so the bundle cannot load against dev/dom.js
+      #                   (measured 2026-08-28). Still true. What changed is
+      #                   what the suite drives: the control's decisions now
+      #                   live in modules that import nothing of Monaco, and
+      #                   dev/smoke.js transpiles and asserts those. Read its
+      #                   header before assuming it covers what a sibling's
+      #                   does — it proves the decision, not the wiring.
       #
-      # check-template and lint are a piece of work, not a decision: adding
-      # scripts/check-template.mjs and a lint script is what lets those two go.
-      check-template: false
-      lint: false
-      # smoke is different, and it is not going away.
-      #
-      # The shared rig drives the built bundle in Node against dev/dom.js, a
-      # deliberately small shim implementing what PCF controls actually touch.
-      # This control mounts Monaco, which is a browser application: the bundle
-      # does not merely fail to render there, it fails to *load*, throwing on
-      # `document.getElementsByTagName` at module scope before any control code
-      # runs (measured 2026-08-28 against the 15 MB production bundle).
-      #
-      # Adding that one method gets to the next missing API, and the one after.
-      # Making the shim big enough for Monaco means writing a browser, which is
-      # the thing dom.js says in its own header that it will not do. The honest
-      # options are jsdom as a devDependency, or accepting that this control is
-      # verified by being used rather than by assertion. Neither is a line in
-      # this file.
-      smoke: false
       # msbuild's project lives here rather than in Solution/.
       solution-dir: CodeEditorSolution

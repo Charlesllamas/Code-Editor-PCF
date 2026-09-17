@@ -3,6 +3,9 @@
 // see docs/limitations.md on the 5 MB Dataverse web resource cap before
 // widening this list.
 import * as monaco from "monaco-editor/editor/editor.api";
+import "./monacoFeatures";
+import { format as formatJson, applyEdits } from "jsonc-parser";
+import { resolveLanguage as resolve } from "./languages";
 
 // Registering a language gives monaco its id, extensions and aliases, and wires
 // a lazy tokens-provider factory. Under PCF's single-chunk build that factory
@@ -25,10 +28,36 @@ import { conf as htmlConf, language as htmlLang } from "monaco-editor/languages/
 import { conf as jsConf, language as jsLang } from "monaco-editor/languages/definitions/javascript/javascript";
 import { conf as tsConf, language as tsLang } from "monaco-editor/languages/definitions/typescript/typescript";
 
-// JSON language service. Costs roughly 1.9 MB because it drags in editor
-// features that tree-shaking otherwise drops; kept because JSON is this
-// control's default and most common language.
-import "monaco-editor/language/json/monaco.contribution";
+// JSON, by its tokenizer alone.
+//
+// 1.1.0 imported `monaco-editor/language/json/monaco.contribution`, which
+// registers this same tokenizer *and* nine language-service providers that
+// each proxy to a web worker -- and under PCF's single-file build no worker
+// can start, so every one of them was dead weight: roughly 1.9 MB of LSP
+// adapters, and a rejected promise in the console the first time a JSON model
+// was opened. The tokenizer is the only part that ever ran, and it is a
+// main-thread module with one small dependency. The configuration below is
+// what jsonMode.ts would have registered beside it.
+import { createTokenizationSupport as jsonTokens } from "monaco-editor/languages/features/json/tokenization";
+
+// No web workers, said up front.
+//
+// The editor still asks for one -- `editorWorkerService` backs word-based
+// completion, link detection and diff -- and left to itself Monaco 0.56
+// resolves that through `new URL('…?esm', import.meta.url)`, which under a
+// single-file build points at a stub webpack emitted beside bundle.js and
+// the platform never serves. The failure is asynchronous: four errors in the
+// console, a fetch that 404s, and then the main-thread fallback anyway.
+//
+// A `getWorker` that throws is the synchronous route to the same fallback:
+// `StandaloneWebWorkerService._createWorker` calls it before touching the
+// URL, `EditorWorkerClient._getOrCreateWorker` catches, warns **once** and
+// builds the in-process worker. Same editor, one honest warning.
+(globalThis as { MonacoEnvironment?: unknown }).MonacoEnvironment = {
+    getWorker(): Worker {
+        throw new Error("Code Editor runs Monaco without web workers: a PCF control is served as one file.");
+    }
+};
 
 interface GrammarEntry {
     id: string;
@@ -64,33 +93,54 @@ for (const grammar of GRAMMARS) {
     monaco.languages.setLanguageConfiguration(grammar.id, grammar.conf);
 }
 
-// Monaco resolves language ids, not aliases. A maker who types "DAX" or "M"
-// would otherwise silently get plain text.
-const ALIASES: Record<string, string> = {
-    dax: "msdax",
-    m: "powerquery",
-    "power query": "powerquery",
-    powerquerym: "powerquery",
-    yml: "yaml",
-    tsql: "sql",
-    "t-sql": "sql",
-    cs: "csharp",
-    "c#": "csharp",
-    ps1: "powershell",
-    md: "markdown",
-    py: "python",
-    js: "javascript",
-    ts: "typescript",
-    node: "javascript",
-    ecmascript: "javascript"
-};
+monaco.languages.register({ id: "json", extensions: [".json", ".jsonc"], aliases: ["JSON", "json"], mimetypes: ["application/json"] });
+// `true` keeps comments tokenized as comments, so a maker who turned
+// validation off for a commented file still sees them greyed rather than red.
+monaco.languages.setTokensProvider("json", jsonTokens(true));
+monaco.languages.setLanguageConfiguration("json", {
+    wordPattern: /(-?\d*\.\d\w*)|([^[{\]}:"\s,]+)/g,
+    comments: { lineComment: "//", blockComment: ["/*", "*/"] },
+    brackets: [["{", "}"], ["[", "]"]],
+    autoClosingPairs: [
+        { open: "{", close: "}", notIn: ["string"] },
+        { open: "[", close: "]", notIn: ["string"] },
+        { open: "\"", close: "\"", notIn: ["string"] }
+    ],
+    folding: {
+        markers: { start: /^\s*\/\/\s*#?region\b/, end: /^\s*\/\/\s*#?endregion\b/ }
+    }
+});
+
+// Format Document for JSON, on the main thread. Registering a provider is
+// what lights up Monaco's own command -- Shift+Alt+F and the context-menu
+// entry -- so the strip's Format button runs the same action rather than a
+// second implementation. jsonc-parser's formatter keeps comments and gives
+// up on nothing, so a broken document formats as far as it parses.
+monaco.languages.registerDocumentFormattingEditProvider("json", {
+    provideDocumentFormattingEdits(model, options) {
+        const text = model.getValue();
+        const edits = formatJson(text, undefined, {
+            tabSize: options.tabSize,
+            insertSpaces: options.insertSpaces,
+            eol: model.getEOL()
+        });
+        // One edit for the whole document is cheaper for Monaco to apply than
+        // jsonc-parser's per-gap list, and undo treats it as one step.
+        const formatted = applyEdits(text, edits);
+        if (formatted === text) {
+            return [];
+        }
+        return [{ range: model.getFullModelRange(), text: formatted }];
+    }
+});
+
+/** Every id the bundle registered, for the pure resolver. */
+export function knownLanguages(): string[] {
+    return monaco.languages.getLanguages().map((l) => l.id);
+}
 
 export function resolveLanguage(raw: string | null | undefined): string {
-    const key = (raw ?? "json").trim().toLowerCase();
-    const resolved = ALIASES[key] ?? key;
-    const known = monaco.languages.getLanguages().some((l) => l.id === resolved);
-    return known ? resolved : "plaintext";
+    return resolve(raw, knownLanguages());
 }
 
 export default monaco;
-

@@ -134,4 +134,58 @@
   <data name="Language_Desc_Key" xml:space="preserve">
     <value>Language Mode(json,xml,..).</value>
   </data>
+  <data name="Theme_Display_Key" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="Theme_Desc_Key" xml:space="preserve">
+    <value>auto follows the app's light or dark theme; light and dark force one.</value>
+  </data>
+  <data name="Theme_Auto_Key" xml:space="preserve">
+    <value>Auto</value>
+  </data>
+  <data name="Theme_Light_Key" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Theme_Dark_Key" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="Height_Display_Key" xml:space="preserve">
+    <value>Height</value>
+  </data>
+  <data name="Height_Desc_Key" xml:space="preserve">
+    <value>Height in pixels when the form allocates none. Blank is 500. With Fit content on, the most it grows to.</value>
+  </data>
+  <data name="FitContent_Display_Key" xml:space="preserve">
+    <value>Fit content</value>
+  </data>
+  <data name="FitContent_Desc_Key" xml:space="preserve">
+    <value>Grow and shrink with the document, up to Height. Ignored where the host sizes the control, as a canvas app does.</value>
+  </data>
+  <data name="Validation_Display_Key" xml:space="preserve">
+    <value>Validation</value>
+  </data>
+  <data name="Validation_Desc_Key" xml:space="preserve">
+    <value>Mark faults in JSON and XML documents and name the first one under the editor. Turn off for JSON with comments.</value>
+  </data>
+  <data name="Validation_On_Key" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="Validation_Off_Key" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Status_NoProblems" xml:space="preserve">
+    <value>No problems</value>
+  </data>
+  <data name="Status_More" xml:space="preserve">
+    <value>+{0} more</value>
+  </data>
+  <data name="Status_GoToProblem" xml:space="preserve">
+    <value>Go to the problem</value>
+  </data>
+  <data name="Status_Format" xml:space="preserve">
+    <value>Format</value>
+  </data>
+  <data name="Status_FormatHint" xml:space="preserve">
+    <value>Format document (Shift+Alt+F)</value>
+  </data>
 </root>

@@ -29,17 +29,23 @@ See [Installation](installation) for the full list of accepted values.
 
 ## Why is there no red underline on my broken JSON?
 
-Validation runs in a Monaco web worker, and Power Apps serves a code component
-as a single file with no way to serve worker files beside it. Colouring, bracket
-matching and folding all work; validation and completion do not. See
-[Limitations](limitations).
+There is, from 1.2.0: a strict JSON parse runs on the main thread and marks
+every fault, and the strip under the editor names the first. If you see none,
+check three things — `language` resolves to `json` (the strip shows the
+language it resolved to), `validation` is not `off`, and the document is not
+in one of the twelve other languages, which are coloured but not checked.
+
+Comments and trailing commas are faults. A column that holds JSON with
+comments on purpose is what `validation: off` is for.
 
 ## The editor takes up the whole screen. Can I make it smaller?
 
 That was the old behaviour — the height was hardcoded to 90% of the viewport.
-The control now sizes itself from what the form allocates it, falling back to
-500 pixels when the form allocates nothing. In a canvas app it matches the box
-you draw.
+The control sizes itself from what the form allocates it; where the form
+allocates nothing, the `height` property decides, and blank means 500 pixels.
+Turn on `fitContent` for an editor that grows and shrinks with the document,
+up to that height. In a canvas app it matches the box you draw, and neither
+property applies.
 
 ## I changed the record in my gallery and the editor did not update.
 
@@ -61,12 +67,11 @@ whether the lock comes from the form, a business rule or field security.
 
 Older releases did not check any of this.
 
-## Can it validate the JSON before saving?
+## Can it stop an invalid document being saved?
 
-No, on two counts. The component framework gives a control no way to cancel a
-save, and the language workers that would produce the error in the first place
-cannot run. Validation that has to hold belongs in a synchronous plugin or a
-business rule.
+No. It marks the fault and names it, but the component framework gives a
+control no way to cancel a save. Validation that has to hold belongs in a
+synchronous plugin or a business rule.
 
 ## Why is my column not offered when I add the control?
 
@@ -76,8 +81,8 @@ the **Text Area** format. A plain single-line text column will not appear.
 ## Which languages are supported?
 
 JSON, XML, SQL, YAML, Power Query M, DAX, Markdown, PowerShell, C#, Python, CSS,
-HTML, JavaScript and TypeScript. Colouring only — see the validation question
-above.
+HTML, JavaScript and TypeScript. Validation and Format for JSON, validation
+for XML, colouring for all fourteen.
 
 That is fourteen of the roughly eighty grammars Monaco ships. The list is a
 curated choice rather than a limit; [Limitations](limitations) covers how to add
@@ -85,7 +90,16 @@ one.
 
 ## Can I change the theme?
 
-Not in this version. The editor renders in Monaco's default light theme.
+`theme` is `auto`, `light` or `dark`. `auto` follows the app — a
+model-driven app with the modern look publishes whether it is dark, and the
+editor follows it; a canvas app publishes nothing, so `auto` is light there
+and `dark` is how to get the dark editor. The theme is global to the page, so
+two editors on one form share it.
+
+## How do I format a document?
+
+Press **Format** in the strip, or `Shift+Alt+F`, or use **Format Document**
+from the right-click menu — all three run the same formatter. JSON only.
 
 ## Something is broken. Where do I report it?
 

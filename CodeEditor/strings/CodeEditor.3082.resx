@@ -134,4 +134,58 @@
   <data name="Language_Desc_Key" xml:space="preserve">
     <value>Lenguaje de código(json,xml,..).</value>
   </data>
+  <data name="Theme_Display_Key" xml:space="preserve">
+    <value>Tema</value>
+  </data>
+  <data name="Theme_Desc_Key" xml:space="preserve">
+    <value>auto sigue el tema claro u oscuro de la aplicación; light y dark fuerzan uno.</value>
+  </data>
+  <data name="Theme_Auto_Key" xml:space="preserve">
+    <value>Automático</value>
+  </data>
+  <data name="Theme_Light_Key" xml:space="preserve">
+    <value>Claro</value>
+  </data>
+  <data name="Theme_Dark_Key" xml:space="preserve">
+    <value>Oscuro</value>
+  </data>
+  <data name="Height_Display_Key" xml:space="preserve">
+    <value>Alto</value>
+  </data>
+  <data name="Height_Desc_Key" xml:space="preserve">
+    <value>Alto en píxeles cuando el formulario no asigna ninguno. En blanco es 500. Con Ajustar al contenido, el máximo al que crece.</value>
+  </data>
+  <data name="FitContent_Display_Key" xml:space="preserve">
+    <value>Ajustar al contenido</value>
+  </data>
+  <data name="FitContent_Desc_Key" xml:space="preserve">
+    <value>Crece y se reduce con el documento, hasta Alto. Se ignora donde el anfitrión dimensiona el control, como en una aplicación de lienzo.</value>
+  </data>
+  <data name="Validation_Display_Key" xml:space="preserve">
+    <value>Validación</value>
+  </data>
+  <data name="Validation_Desc_Key" xml:space="preserve">
+    <value>Marca errores en documentos JSON y XML y nombra el primero debajo del editor. Desactívala para JSON con comentarios.</value>
+  </data>
+  <data name="Validation_On_Key" xml:space="preserve">
+    <value>Activada</value>
+  </data>
+  <data name="Validation_Off_Key" xml:space="preserve">
+    <value>Desactivada</value>
+  </data>
+  <data name="Status_NoProblems" xml:space="preserve">
+    <value>Sin problemas</value>
+  </data>
+  <data name="Status_More" xml:space="preserve">
+    <value>+{0} más</value>
+  </data>
+  <data name="Status_GoToProblem" xml:space="preserve">
+    <value>Ir al problema</value>
+  </data>
+  <data name="Status_Format" xml:space="preserve">
+    <value>Formatear</value>
+  </data>
+  <data name="Status_FormatHint" xml:space="preserve">
+    <value>Formatear documento (Mayús+Alt+F)</value>
+  </data>
 </root>

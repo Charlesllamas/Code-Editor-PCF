@@ -1,6 +1,6 @@
 # Code-Editor/PCF
 
-![Code Editor PCF](https://user-images.githubusercontent.com/13281127/168442032-f3f678f1-6160-40de-875c-40ebd646c417.png)
+![A JSON document in the Code Editor with two faults marked, and the strip beneath it naming the first](media/screenshot.png)
 ## Synopsis
 
 Code Editor PCF implements `Monaco editor` in order to show text area field as a code editor.
@@ -92,11 +92,26 @@ whole of it — anything else renders as plain text.
 Common aliases resolve to the ids above and matching is case-insensitive:
 `DAX`, `M`, `Power Query`, `yml`, `T-SQL`, `C#`, `ps1`, `md`, `py`, `js`, `ts`.
 
-> **No IntelliSense or validation.** Monaco runs those in web workers, and Power
-> Apps serves a code component as a single JavaScript file with no way to serve
-> worker files beside it. Syntax colouring, bracket matching, folding and find
-> all work; completion and error underlines do not — including for JavaScript
-> and TypeScript, which are colouring-only here. See
+Four optional properties arrived in 1.2.0, and a form configured for 1.1.0
+upgrades without touching them:
+
+| Property | Values | What it does |
+|---|---|---|
+| `theme` | `auto` (default), `light`, `dark` | `auto` follows the app's theme where the app publishes one (the modern model-driven look) and is light where it does not (canvas). |
+| `height` | pixels | The editor's height where the form allocates none; blank is 500. Ignored where the host sizes the control, as a canvas app does. |
+| `fitContent` | on/off | Grow and shrink with the document, up to `height`. |
+| `validation` | `on` (default), `off` | Strict JSON and well-formed XML, marked in the editor and named in the strip beneath it. `off` for a column holding JSON with comments. |
+
+The strip under the editor shows the resolved language, the first fault with
+its line and column (press it to jump there, hover the underline to read it),
+and **Format** for JSON — the same formatter as `Shift+Alt+F` and the
+right-click menu.
+
+> **No IntelliSense, and validation for JSON and XML only.** Monaco's language
+> services run in web workers, and Power Apps serves a code component as a
+> single JavaScript file with no way to serve worker files beside it. The JSON
+> and XML checks run on the main thread instead; the other twelve languages
+> are coloured, not checked, and no language gets completion. See
 > [docs/limitations.md](docs/limitations.md).
 
 #### Notes

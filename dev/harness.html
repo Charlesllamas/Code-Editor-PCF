@@ -22,17 +22,26 @@
             that a save persists anything, or that field-level security behaves
             the way `SECURITY` below claims. Those belong in SPEC.md.
 
-            Self-contained on purpose: the fixture is inline and every path is
-            relative, so this works over `file://` with no server. The bundle is
-            large — Monaco is inside it — so the first load is not instant.
+            Run it through `npm run harness`, which serves the repository;
+            over `file://` the stylesheet still loads but a browser may refuse
+            the bundle. The bundle is large — Monaco is inside it — so the
+            first load is not instant.
+
+            **Host allocates a height** is the switch that matters most for
+            1.2.0: a model-driven form usually reports `allocatedHeight: -1`
+            and a canvas app never does, and the three-way decision in
+            `sizing.ts` only shows its second and third branches when the
+            box is unchecked.
         -->
 
         <!--
-            No stylesheet to link: this control ships none. Monaco brings its own
-            and the container is sized from allocatedWidth/Height rather than by
-            CSS, which is unusual in this house and worth knowing before you go
-            looking for the file.
+            Two stylesheets on a form: Monaco's, which is inside the bundle, and
+            the control's own css/CodeEditor.css for the strip under the
+            editor, which the platform loads as a separate resource -- so it is
+            linked here the way a form would. Sizing is still by
+            allocatedWidth/Height and not by CSS, which is unusual in this house.
         -->
+        <link rel="stylesheet" href="../out/controls/CodeEditor/css/CodeEditor.css" />
         <style>
             body {
                 margin: 0;
@@ -155,9 +164,54 @@
             </label>
 
             <label>
-                Height
+                <input type="checkbox" id="harness-allocates" checked />
+                Host allocates a height
+            </label>
+
+            <label>
+                Allocated height
                 <input type="number" id="harness-height" value="320" min="120" max="800" step="20" />
             </label>
+        </div>
+
+        <div class="harness-controls">
+            <label>
+                Theme property
+                <select id="harness-theme">
+                    <option value="auto">auto</option>
+                    <option value="light">light</option>
+                    <option value="dark">dark</option>
+                </select>
+            </label>
+
+            <label>
+                App theme
+                <select id="harness-app-theme">
+                    <option value="none">publishes none (canvas, classic)</option>
+                    <option value="light">light</option>
+                    <option value="dark">dark</option>
+                </select>
+            </label>
+
+            <label>
+                Height property
+                <input type="number" id="harness-pref-height" value="" placeholder="blank" min="0" max="2000" step="20" />
+            </label>
+
+            <label>
+                <input type="checkbox" id="harness-fit" />
+                Fit content
+            </label>
+
+            <label>
+                Validation
+                <select id="harness-validation">
+                    <option value="on">on</option>
+                    <option value="off">off</option>
+                </select>
+            </label>
+
+            <button type="button" id="harness-break">Put a fault in the column</button>
 
             <button type="button" id="harness-empty">Clear the column</button>
             <button type="button" id="harness-rerender">updateView again</button>

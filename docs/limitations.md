@@ -25,36 +25,49 @@ Earlier releases fetched the whole of Monaco from a CDN and so supported
 everything it had a grammar for. The move to a bundled editor traded that
 breadth for a control that loads on a restricted network.
 
-## No IntelliSense or validation, in any language
+## Validation covers JSON and XML, and nothing else
 
-Monaco's language services — completion, hover, and the red underlines under
-malformed JSON — run in web workers. Power Apps serves a code component as one
+Monaco's language services — completion, hover documentation, schema-aware
+validation — run in web workers. Power Apps serves a code component as one
 JavaScript file and provides no way to serve the extra worker files alongside
-it, so those workers cannot start.
+it, so those workers cannot start, and none of that runs here.
 
-What survives is everything that runs on the main thread: syntax colouring,
-bracket matching, folding, indentation, find and replace. What is gone is
-validation and completion. A malformed JSON document is coloured but not
-flagged.
+What 1.2.0 adds is the half that needs no worker. A JSON document is parsed
+on the main thread — strictly, so comments and trailing commas are faults —
+and every fault is marked in the editor and named in the strip beneath it. An
+XML document goes through the browser's own parser, which reports the first
+fault only, because that is what `DOMParser` reports. The other twelve
+languages are coloured and not checked.
 
-## The bundle is close to the platform's size limit
+Two things this is not: it is not IntelliSense, so there is no completion in
+any language; and it is not schema validation, so a JSON document that is
+well-formed but wrong for your integration passes.
 
-`bundle.js` is about 4.9 MB. Dataverse rejects a web resource larger than 5 MB
-by default, so the control imports into a default environment — but with little
-room. If you fork this and add language services or more grammars, check the
-built size before shipping. Administrators can raise the ceiling to 128 MB via
-**Power Platform admin centre → Environments → Settings → Email**, but needing
-that would make the control harder to deploy.
+## Format is JSON only
 
-## Height falls back to 500px when the form does not constrain it
+**Format** in the strip, `Shift+Alt+F` and the context-menu entry all run the
+same formatter, and the control registers one for JSON only. It keeps comments
+and formats as much of a broken document as parses. XML and the rest have no
+formatter; the button is not shown for them.
 
-The control sizes itself from what the platform allocates. Model-driven forms
-frequently allocate no explicit height, in which case the editor renders 500
-pixels tall. There is no property to change that; it is a constant in the
-control.
+## Sizing depends on who has an opinion
 
-Canvas apps always give a control explicit dimensions, so there the editor
-matches the box you draw.
+Three parties can decide the height, in this order: the host, when it
+allocates one (a canvas app always does; a model-driven form sometimes does);
+then the maker's `height` property; then 500 pixels, which is what earlier
+releases hard-wired.
+
+`fitContent` grows and shrinks the editor with the document, but only
+**below** that number — a form section grows around its contents, and a
+document of three thousand lines would otherwise be a three-thousand-line
+form. Where the host allocates a box, `fitContent` does nothing; the box wins.
+
+## The theme is global
+
+Monaco has one theme per page. `theme` set to `auto` follows the app, which is
+what every editor on a form wants; a maker who forces `light` on one editor and
+`dark` on another gets whichever rendered last. In a canvas app, and on the
+classic model-driven look, the app publishes no theme and `auto` means light.
 
 ## External changes are ignored while you are typing
 
@@ -73,14 +86,19 @@ value.
 ## It cannot block a save
 
 The Power Apps component framework does not let a control cancel a save, so an
-invalid document saves like any other value. With the language workers
-unavailable this matters more than it used to: there are no error underlines to
-notice in the first place.
+invalid document saves like any other value. The marker and the strip make the
+fault visible; they do not make it impossible.
 
-## No theme property
+## The bundle and the platform's size limit
 
-The editor renders in Monaco's default light theme regardless of the app's
-appearance.
+`bundle.js` is about 4.1 MB. Dataverse rejects a web resource larger than 5 MB
+by default, so the control imports into a default environment with room to
+spare — earlier releases sat at 4.9 MB, because they carried Monaco's JSON
+language service as well, all of it dead weight behind workers that could never
+start. If you fork this and add grammars or editor features, check the built
+size before shipping. Administrators can raise the ceiling to 128 MB via
+**Power Platform admin centre → Environments → Settings → Email**, but needing
+that would make the control harder to deploy.
 
 ## Large documents get slow
 
@@ -92,4 +110,5 @@ the hundreds of kilobytes are usable but noticeably slower to save.
 ## Keyboard shortcuts are captured while focused
 
 Monaco binds a lot of keys. While the cursor is inside the editor, app- or
-browser-level shortcuts sharing those bindings will not fire.
+browser-level shortcuts sharing those bindings will not fire. `Ctrl+M` releases
+`Tab` so keyboard users can move on to the next field.

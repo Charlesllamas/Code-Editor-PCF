@@ -57,7 +57,10 @@ moves focus out of the editor anyway.
 ## Other rough edges
 
 - The editor fills the box you give it. A short box gets a short editor with its
-  own scrollbar rather than an overflow.
+  own scrollbar rather than an overflow. `height` and `fitContent` do nothing
+  here — the box you draw is the height.
+- A canvas app publishes no theme, so `theme: auto` is light. Set `dark` for
+  the dark editor.
 - Monaco captures keyboard shortcuts while focused, so app-level shortcuts bound
   to the same keys will not fire while the cursor is in the editor. `Ctrl+F`
   opens Monaco's find widget.

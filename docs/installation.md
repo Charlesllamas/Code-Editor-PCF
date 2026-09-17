@@ -28,8 +28,8 @@ For a canvas app you also have to enable code components on the app itself — s
 :::callout{type=info}
 The control makes no external requests — Monaco is compiled into the solution —
 so there is no CDN or firewall prerequisite. The trade is size: `bundle.js` is
-about 4.9 MB against a default Dataverse limit of 5 MB. It imports into a default
-environment as shipped, but leaves little headroom if you fork and extend it.
+about 4.1 MB against a default Dataverse limit of 5 MB. It imports into a default
+environment as shipped; check the built size if you fork and extend it.
 :::
 
 ## Add it to a model-driven form
@@ -75,9 +75,9 @@ than failing — so a typo shows up as an uncoloured document, not an error.
 
 :::callout{type=warning}
 This list is the whole of it. Java, PHP, C++, Ruby and the rest of Monaco's
-eighty grammars are not bundled, and none of the fourteen get IntelliSense or
-validation. [Limitations](limitations) explains the reasoning — and how to add a
-language if you need one.
+eighty grammars are not bundled, and none of the fourteen get IntelliSense.
+Validation covers JSON and XML only. [Limitations](limitations) explains the
+reasoning — and how to add a language if you need one.
 :::
 
 ## Build it yourself

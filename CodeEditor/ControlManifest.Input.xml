@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PCF" constructor="CodeEditor" version="1.1.0" display-name-key="Code_Editor_Name_Key" description-key="Code_Editor_Desc_Key" control-type="standard" >
+  <control namespace="PCF" constructor="CodeEditor" version="1.2.0" display-name-key="Code_Editor_Name_Key" description-key="Code_Editor_Desc_Key" control-type="standard" >
     <!--external-service-usage node declares whether this 3rd party PCF control is using external service or not, if yes, this control will be considered as premium and please also add the external domain it is using.
     If it is not using any external service, please set the enabled="false" and DO NOT add any domain below. The "enabled" will be false by default.
     Example1:
@@ -24,8 +24,42 @@
     <!-- property node identifies a specific, configurable piece of data that the control expects from CDS -->
     <property name="code" display-name-key="Code_Display_Key" description-key="Code_Desc_Key" of-type-group="text" usage="bound" required="true" />
     <property name="language" display-name-key="Language_Display_Key" description-key="Language_Desc_Key" of-type="SingleLine.Text" usage="input" required="true" />
+
+    <!--
+      An Enum rather than a TwoOptions, because the default is not "off": auto
+      follows the app's theme, and a maker who never opens the property panel
+      should get that. An Enum carries a real default-value; a TwoOptions
+      cannot default to on (see the skill's property-types notes).
+    -->
+    <property name="theme" display-name-key="Theme_Display_Key" description-key="Theme_Desc_Key" of-type="Enum" usage="input" required="false" default-value="auto">
+      <value name="auto" display-name-key="Theme_Auto_Key">auto</value>
+      <value name="light" display-name-key="Theme_Light_Key">light</value>
+      <value name="dark" display-name-key="Theme_Dark_Key">dark</value>
+    </property>
+
+    <!--
+      No default-value, deliberately. The host's allocatedHeight wins whenever
+      it is positive, and a default here would read as an override of it. Blank
+      means "500px when the form allocates nothing", which is what 1.1.0 did.
+    -->
+    <property name="height" display-name-key="Height_Display_Key" description-key="Height_Desc_Key" of-type="Whole.None" usage="input" required="false" />
+
+    <!-- Off by default is the honest default here: off is 1.1.0's behaviour. -->
+    <property name="fitContent" display-name-key="FitContent_Display_Key" description-key="FitContent_Desc_Key" of-type="TwoOptions" usage="input" required="false" />
+
+    <!--
+      Strict JSON and well-formed XML, marked in the editor and named in the
+      strip beneath it. An Enum so that on is the default; a column holding
+      JSON with comments is what "off" is for.
+    -->
+    <property name="validation" display-name-key="Validation_Display_Key" description-key="Validation_Desc_Key" of-type="Enum" usage="input" required="false" default-value="on">
+      <value name="on" display-name-key="Validation_On_Key">on</value>
+      <value name="off" display-name-key="Validation_Off_Key">off</value>
+    </property>
+
     <resources>
       <code path="index.ts" order="1"/>
+      <css path="css/CodeEditor.css" order="1" />
       <resx path="strings/CodeEditor.1033.resx" version="1.0.0" />
       <resx path="strings/CodeEditor.3082.resx" version="1.0.0" />
     </resources>

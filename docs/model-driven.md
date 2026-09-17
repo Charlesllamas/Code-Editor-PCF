@@ -14,10 +14,12 @@ below assumes a model-driven form unless it says otherwise.
 The control asks the platform to report container resizes and sizes the editor
 from the width and height the form allocates it.
 
-Model-driven forms often allocate no explicit height, and in that case the
-editor falls back to **500 pixels**. That is a constant in the control, not a
-property, so if it is the wrong height for your form the answer is a section
-sized to suit it.
+Model-driven forms usually allocate no explicit height, and then the
+`height` property decides — blank means **500 pixels**, which is what earlier
+releases hard-wired. With `fitContent` on, the editor is as tall as its
+document, between a few lines and that number; the form section grows and
+shrinks with it. The strip beneath the editor is inside the height, not added
+to it.
 
 :::callout{type=info}
 Earlier releases rendered at `height: 90vh` regardless of what the form
@@ -46,10 +48,32 @@ If the column feeds an integration that will fail on malformed input, validate i
 somewhere that can actually stop the save — a synchronous plugin on the `Update`
 message, or a business rule.
 
-Do not rely on the user noticing a red squiggle: the bundled build has no
-validation at all, so there is no squiggle to notice. See
+The editor's own check is a warning, not a gate: a JSON or XML fault is marked
+and named in the strip, and the user can still save. See
 [Limitations](limitations).
 :::
+
+## Validation and Format
+
+With `validation` on (the default), a JSON document is parsed strictly on
+every pause in typing — comments and trailing commas are faults — and an XML
+document is checked for well-formedness. Each fault is underlined; the strip
+names the first with its line and column and counts the rest, and pressing it
+moves the caret there. Hovering a fault reads it in place, and `F8` walks
+them.
+
+**Format** in the strip tidies a JSON document with two-space indentation and
+keeps its comments; `Shift+Alt+F` and the right-click menu do the same. It is
+not shown for other languages or on a read-only column.
+
+## Theme
+
+`theme: auto` follows the app. On the modern look the platform tells the
+control whether the app is dark and the editor switches with it; on the classic
+look nothing is published and the editor is light. `light` and `dark` force
+one regardless. Monaco's theme is global to the page, so two editors on one
+form share whichever was set last — with `auto` on both that is never a
+difference.
 
 ## Read-only columns
 

@@ -10,7 +10,7 @@ Code Editor replaces the plain textarea a multiline text column gets by default
 with the [Monaco editor](https://microsoft.github.io/monaco-editor/) — the same
 editor that runs inside Visual Studio Code.
 
-::image{src=media/screenshot.png alt="A JSON document in the Code Editor, with line numbers, syntax highlighting and indent guides" zoom}
+::image{src=media/screenshot.png alt="A JSON document in the Code Editor with two faults marked, and the strip beneath it naming the first" zoom}
 
 It exists because of a specific, common situation: a solution stores JSON or XML
 in a text column, and somebody eventually has to edit it. Without an editor that
@@ -21,18 +21,27 @@ numbers, and finding out it was wrong when the integration fails.
 
 - Syntax colouring for fourteen languages: JSON, XML, SQL, YAML, Power Query M,
   DAX, Markdown, PowerShell, C#, Python, CSS, HTML, JavaScript and TypeScript.
-- Bracket matching, folding, indentation and line numbers.
-- Find and replace, multi-cursor, and the rest of Monaco's editing surface.
-- An editor that sizes itself to the space the form gives it.
+- **Validation for JSON and XML** — faults marked in the editor and named in
+  the strip beneath it, with a click to jump to the first. Strict JSON: no
+  comments, no trailing commas.
+- **Format** for JSON, from the strip, the context menu or `Shift+Alt+F`.
+- **Light or dark**, following the app's theme or forced either way.
+- Bracket matching, folding, indentation, find and replace, multi-cursor, and
+  a context menu.
+- An editor that sizes itself to the space the form gives it — or to the
+  document, with `fitContent`, up to a height you choose.
 - No network calls. Monaco is compiled into the solution.
+
+::image{src=media/screenshot-dark.png alt="The same editor in the dark theme, sized to its eight-line document" zoom}
 
 ## What you do not get
 
 :::callout{type=warning}
-**No IntelliSense, completion or validation — in any language.** Those features
-run in Monaco web workers, and Power Apps serves a code component as a single
-JavaScript file with no way to serve worker files alongside it. Broken JSON is
-coloured, not flagged.
+**No IntelliSense or completion, in any language, and no validation beyond
+JSON and XML.** Monaco's language services run in web workers, and Power Apps
+serves a code component as a single JavaScript file with no way to serve
+worker files alongside it. The JSON and XML checks run on the main thread
+instead; the other twelve languages are coloured, not flagged.
 
 **Fourteen languages, not eighty.** Monaco has grammars for around eighty; this
 control bundles a curated fourteen. Anything else renders as plain text. Adding
@@ -48,9 +57,9 @@ silently rendered an empty box.
 
 ## What it is not
 
-This is an editor, not a validator. Nothing here stops an invalid value being
-saved — Power Apps gives a control no way to reject a save, so validation
-belongs in a business rule or a plugin.
+This is an editor, not a gate. It shows a fault; it cannot refuse to save one
+— Power Apps gives a control no way to reject a save, so validation that has
+to hold belongs in a business rule or a plugin.
 
 ## Properties
 
