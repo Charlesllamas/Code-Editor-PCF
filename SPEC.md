@@ -98,33 +98,37 @@ page registers `ComponentFramework.registerControl` before the bundle's
 States: `faults` (light, 220px, the two-fault document), `dark` (fit content,
 eight lines → 176px), `xml` (fit content, five lines → 119px).
 
+## Measured on the form
+
+The 1.1.9 probe, imported over 1.1.0 on the Accounts test form, 2026-09-17.
+
+- **P1 — `fluentDesignLanguage.isDarkTheme` reaches a standard field control
+  on a model-driven form.** `theme: auto` follows the app; `dark` forces the
+  dark editor on a light form. Whether `updateView` fires on a theme toggle
+  with the form open was not tried separately.
+- **P2 — `allocatedHeight` is `-1` on the form section**, and with
+  `fitContent` on the section grows with the document. **The form designer's
+  height-in-rows is a ceiling the control cannot see**: the editor grew until
+  it met the field's 20 rows and stopped there, which is a clip on the section,
+  not an allocation — if it were allocated, the editor could not have grown.
+- **P3 — Format changes the column value** the form saves.
+- **P4 — the property panel shows `height` blank** and `theme` as a choice.
+
 ## Not verified
 
-The 1.2.0 probe. A build was packed and the questions below want the
-Accounts test form; tag `v1.2.0` after the answers, not before.
+What the 1.1.9 probe left open; tag `v1.2.0` after these, not before.
 
-- **P1 — `fluentDesignLanguage.isDarkTheme` reaches a *standard* control on
-  a model-driven form, and `updateView` fires when the user switches the
-  app's theme.** The skill has it measured on a React customizer and a
-  standard grid; not on a standard field control. Expected: the editor
-  follows the app on load and on toggle. If only on load, `auto` still
-  works and the toggle case goes in limitations.
-- **P2 — `allocatedHeight` is `-1` on the form section, and with
-  `fitContent` on the section grows and shrinks with the document.**
-  Expected from the calendar finding (a section is shrink-to-fit). If the
-  section clips instead, `fitContent` needs a `min-height` on the section,
-  which is a maker instruction, not a control fix.
-- **P3 — the markers render on the form's Monaco** (they are the same
-  Monaco; this is a check that the platform's CSP does not strip the
-  squiggle's inline SVG background) and the strip's Format changes the
-  column value the form saves.
-- **P4 — the property panel shows `theme` as a dropdown defaulting to
-  `auto`, `height` blank, `validation` defaulting to `on`.** An Enum's
-  `default-value` has been seen to render as the raw string in the hub's
-  harness; the form designer is the other reader.
+- **P2, the clip:** when `fitContent` meets the form's height-in-rows, is
+  the strip still visible, or cut off under the section's edge? If cut off,
+  the fix is a `ResizeObserver` on the container's parent — request a
+  height, and where the parent comes back shorter, take the parent's — the
+  calendar's rule, applied to height.
+- **P3, the markers:** a fault's squiggle and the strip's message on the
+  form's Monaco (a CSP check on the squiggle's inline SVG background).
+- **P1, the toggle:** whether `updateView` fires when the app's theme is
+  switched with the form open, or only on load.
 - **P5 — a blank `language` now resolves to JSON rather than plain text**;
-  no form is expected to have one, since the property is required, but a
-  1.1.0 form that stored an empty string would change colour on upgrade.
+  no form is expected to have one, since the property is required.
 - The XML message parsing is measured against Chrome's and Firefox's text;
   Safari is assumed to share Chrome's (libxml2) and is unmeasured.
 - The phone client: the strip at narrow widths, and whether a 24px button
