@@ -111,20 +111,20 @@ The 1.1.9 probe, imported over 1.1.0 on the Accounts test form, 2026-09-17.
   height-in-rows is a ceiling the control cannot see**: the editor grew until
   it met the field's 20 rows and stopped there, which is a clip on the section,
   not an allocation — if it were allocated, the editor could not have grown.
-- **P3 — Format changes the column value** the form saves.
+- **P2, the clip:** at the ceiling the strip stays visible at the bottom of
+  the field and the editor scrolls inside — the platform's wrapper sizes
+  the control's container rather than clipping it, so the container's own
+  height is what the control gets and the strip sits inside it. No
+  `ResizeObserver` needed.
+- **P3 — the markers render** (squiggle, overview-ruler mark, and the message
+  in the strip: "Ln 32, Col 1: Expected '}'"), and **Format changes the
+  column value** the form saves.
 - **P4 — the property panel shows `height` blank** and `theme` as a choice.
 
 ## Not verified
 
-What the 1.1.9 probe left open; tag `v1.2.0` after these, not before.
+What the 1.1.9 probe left open. None of it holds the release.
 
-- **P2, the clip:** when `fitContent` meets the form's height-in-rows, is
-  the strip still visible, or cut off under the section's edge? If cut off,
-  the fix is a `ResizeObserver` on the container's parent — request a
-  height, and where the parent comes back shorter, take the parent's — the
-  calendar's rule, applied to height.
-- **P3, the markers:** a fault's squiggle and the strip's message on the
-  form's Monaco (a CSP check on the squiggle's inline SVG background).
 - **P1, the toggle:** whether `updateView` fires when the app's theme is
   switched with the form open, or only on load.
 - **P5 — a blank `language` now resolves to JSON rather than plain text**;

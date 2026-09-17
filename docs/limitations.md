@@ -62,6 +62,11 @@ releases hard-wired.
 document of three thousand lines would otherwise be a three-thousand-line
 form. Where the host allocates a box, `fitContent` does nothing; the box wins.
 
+The form designer's own **height in rows** is a third thing again: the
+control cannot see it, and a `fitContent` editor grows until it meets it and
+then scrolls inside, strip still at the bottom (measured on a form, 2026-09-17).
+Set the rows generously, or leave `height` as the ceiling.
+
 ## The theme is global
 
 Monaco has one theme per page. `theme` set to `auto` follows the app, which is
