@@ -4,11 +4,10 @@
   "name": "Code Editor",
   "tagline": "Edit JSON, XML and other code in a multiline text column, with Monaco.",
   "category": "text-editors",
+  "hosts": ["canvas", "model-driven"],
   "tags": [
     "typescript",
     "localised",
-    "model-driven",
-    "canvas",
     "monaco",
     "json",
     "xml",
