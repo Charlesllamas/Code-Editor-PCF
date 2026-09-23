@@ -188,4 +188,22 @@
   <data name="Status_FormatHint" xml:space="preserve">
     <value>Format document (Shift+Alt+F)</value>
   </data>
+  <data name="Schema_Display_Key" xml:space="preserve">
+    <value>JSON schema</value>
+  </data>
+  <data name="Schema_Desc_Key" xml:space="preserve">
+    <value>A JSON Schema to check the document against: the schema itself, starting with {, or the name of a web resource in this environment, such as new_/schemas/order.json. Blank checks syntax only.</value>
+  </data>
+  <data name="IsValid_Display_Key" xml:space="preserve">
+    <value>Is valid</value>
+  </data>
+  <data name="IsValid_Desc_Key" xml:space="preserve">
+    <value>True when validation found no problems, or is off.</value>
+  </data>
+  <data name="ProblemCount_Display_Key" xml:space="preserve">
+    <value>Problem count</value>
+  </data>
+  <data name="ProblemCount_Desc_Key" xml:space="preserve">
+    <value>How many problems validation found; 0 when it is off.</value>
+  </data>
 </root>

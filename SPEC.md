@@ -121,6 +121,38 @@ The 1.1.9 probe, imported over 1.1.0 on the Accounts test form, 2026-09-17.
   column value** the form saves.
 - **P4 — the property panel shows `height` blank** and `theme` as a choice.
 
+## The 1.2.9 probe — asked before 1.3.0 is written
+
+1.3.0 adds a `schema` input (a JSON Schema inline, or a web resource name),
+Format for XML, and two outputs (`isValid`, `problemCount`). The pure halves
+— `schema.ts`, `formatXml.ts` — exist and are asserted; everything that
+depends on the host waits for these answers. `probe.ts` parks
+`window.__pcfCodeEditorProbe` on every `updateView`; each answer lands below,
+verbatim and dated, and **a wrong answer removes the feature it names**.
+
+**Dataverse has no JSON web resource type** — the twelve are HTML, CSS,
+Script, XML, the image formats, XSL and RESX (Learn, *Web resource types*,
+read 2026-09-23). So a schema is stored as **Script (JScript)**, and the
+loader must read the body as JSON whatever `content-type` says.
+
+Set-up on the test environment: a web resource `cll_/probe/order.schema.json`
+of type **Script (JScript)** holding the scratchpad's `order.schema.json`
+(note whether the designer accepts a `.json` name on that type), published;
+the Accounts form's Code Editor with
+`language` = `json` and `schema` = `cll_/probe/order.schema.json`; the
+column holding `order.document.json`.
+
+| # | Ask | Cuts |
+|---|---|---|
+| P1 | `p.env()`, then `await p.webResource("cll_/probe/order.schema.json")` — does `context.page.getClientUrl` exist on a *standard* field control, and does a same-origin fetch of `/WebResources/<name>` answer 200 with the schema, with no feature declared? Both routes (client URL, root-relative). | The web-resource route; inline only |
+| P2 | `await p.webResource("cll_/probe/missing.json")` — status and body of a name that does not exist; and one created but **not published**. | The named "schema not loaded" states |
+| P3 | Paste `schema-4000-chars.json` into `schema` in the form designer, save, publish; `p.env().schemaRawLength`. Where is the panel's ceiling? | Advertising inline schemas on model-driven |
+| P4 | Import and publish in the **classic** designer too (the `labels` trap); do `isValid`/`problemCount` stay out of the property panel? `p.outputs()` after a fault and after fixing it. | The outputs |
+| P5 | `await p.schema()` — the five faults the suite expects (`Expected a number…` at 2:9, `Must be at least 1` at 4:26, `Missing required property "sku"` at 5:5, `Must be one of…` at 7:13, `Property "note" is not allowed` at 8:3), and **no CSP violation in the console**. | The validator library |
+| P6 | Set `language` = `xml`, paste `fetchxml.xml`; `p.xml()` → `sameTree` and `browserParses` both true; `p.applyXml()`, save, reload, `p.xml().changed` false. | XML Format |
+
+Answers: *pending.*
+
 ## Not verified
 
 What the 1.1.9 probe left open. None of it holds the release.

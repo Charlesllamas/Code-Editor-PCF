@@ -4,6 +4,8 @@ import { displayName } from "./languages";
 import { hasValidator, Problem, validateJson, validateXml } from "./validate";
 import { resolveHeight, resolveWidth, STATUS_BAR_HEIGHT } from "./sizing";
 import { MonacoTheme, resolveTheme } from "./theme";
+// THROWAWAY: the 1.2.9 probe (SPEC.md P1–P6). Remove with probe.ts before 1.3.0.
+import * as probe from "./probe";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -97,6 +99,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
 
         this.layout(context);
         this.runValidate();
+        probe.park(context, this._editor, () => this.getOutputs());
     }
 
     /**
@@ -144,6 +147,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         } else {
             this.renderStatus();
         }
+        probe.park(context, this._editor, () => this.getOutputs());
     }
 
     /**
@@ -151,7 +155,9 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      */
     public getOutputs(): IOutputs {
         return {
-            code: this._code ?? ""
+            code: this._code ?? "",
+            isValid: this._problems.length === 0,
+            problemCount: this._problems.length
         };
     }
 

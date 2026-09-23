@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PCF" constructor="CodeEditor" version="1.2.0" display-name-key="Code_Editor_Name_Key" description-key="Code_Editor_Desc_Key" control-type="standard" >
+  <control namespace="PCF" constructor="CodeEditor" version="1.2.9" display-name-key="Code_Editor_Name_Key" description-key="Code_Editor_Desc_Key" control-type="standard" >
     <!--external-service-usage node declares whether this 3rd party PCF control is using external service or not, if yes, this control will be considered as premium and please also add the external domain it is using.
     If it is not using any external service, please set the enabled="false" and DO NOT add any domain below. The "enabled" will be false by default.
     Example1:
@@ -56,6 +56,23 @@
       <value name="on" display-name-key="Validation_On_Key">on</value>
       <value name="off" display-name-key="Validation_Off_Key">off</value>
     </property>
+
+    <!--
+      A JSON Schema the document is checked against, when validation is on.
+      Starting with "{" it is the schema itself (a canvas formula can pass one);
+      otherwise it is the name of a web resource in this environment, read
+      same-origin — so no feature, no import prompt, and never another host.
+      No default: blank is 1.2.0's behaviour.
+    -->
+    <property name="schema" display-name-key="Schema_Display_Key" description-key="Schema_Desc_Key" of-type="SingleLine.Text" usage="input" required="false" />
+
+    <!--
+      The control's own verdict, for a canvas app to act on — a Save button's
+      DisplayMode, say. Outputs are permanent API: a formula may bind them.
+      With validation off the verdict is the neutral one, valid and 0.
+    -->
+    <property name="isValid" display-name-key="IsValid_Display_Key" description-key="IsValid_Desc_Key" of-type="TwoOptions" usage="output" />
+    <property name="problemCount" display-name-key="ProblemCount_Display_Key" description-key="ProblemCount_Desc_Key" of-type="Whole.None" usage="output" />
 
     <resources>
       <code path="index.ts" order="1"/>
