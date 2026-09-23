@@ -11,7 +11,9 @@
     "refreshTypes": "pcf-scripts refreshTypes",
     "lint": "eslint CodeEditor --ext .ts,.tsx",
     "smoke": "node dev/smoke.js",
-    "harness": "node dev/serve.js"
+    "harness": "node dev/serve.js",
+    "bump": "node scripts/version.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1",

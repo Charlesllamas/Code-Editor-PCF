@@ -13,7 +13,7 @@
  * here would drift, then disagree, and the one nothing executes always loses.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -859,7 +859,27 @@ if (exists(controlsOut)) {
         const bytes = statSync(bundle).size;
         const used = Math.round((bytes / BUNDLE_LIMIT) * 1000) / 10;
 
-        if (bytes > BUNDLE_LIMIT) {
+        /*
+         * Only a production bundle can fail this. `npm run build` always writes
+         * the development one — eval-wrapped, carrying webpack's own "neither
+         * made for production" banner in its first lines — and Monaco's is 12.5
+         * MB against a packed bundle that fits (Code-Editor-PCF, 2026-09-23). A
+         * hard failure there made `npm run check` fail after every local build
+         * of that repository. The pack is the gate; this is the early warning.
+         */
+        const head = Buffer.alloc(1024);
+        const fd = openSync(bundle, 'r');
+        readSync(fd, head, 0, head.length, 0);
+        closeSync(fd);
+        const development = head.toString('utf8').includes('neither made for production');
+
+        if (bytes > BUNDLE_LIMIT && development) {
+            warnings.push(
+                `out/controls/${entry}/bundle.js is the development bundle at ${bytes} bytes, over the ` +
+                `${BUNDLE_LIMIT}-byte web-resource limit. The packed bundle is typically a quarter of that — ` +
+                'confirm with a clean msbuild pack, which is where this is enforced.',
+            );
+        } else if (bytes > BUNDLE_LIMIT) {
             problems.push(
                 `out/controls/${entry}/bundle.js is ${bytes} bytes, over the ${BUNDLE_LIMIT}-byte ` +
                 'Dataverse web-resource limit. It will not import into a default environment.',
