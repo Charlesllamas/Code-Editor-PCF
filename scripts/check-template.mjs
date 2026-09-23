@@ -24,8 +24,12 @@ const SKIP_DIRS = new Set(['.git', 'node_modules', 'out', 'bin', 'obj', 'generat
 // The adoption scripts name every token they replace, so they always "contain
 // placeholders" — they are the things that remove them. setup.mjs deletes
 // adopt.mjs on adoption, but a repo may still be mid-flight when this runs.
+// `scripts/templates/` holds donor pages that `version.mjs` writes when a
+// release needs one — they carry `__VERSION__` for the same reason the
+// adoption scripts carry `CodeEditor`: they are the thing that fills it in.
 const SKIP_PATHS = new Set([
     'scripts/setup.mjs', 'scripts/adopt.mjs', 'scripts/add-control.mjs', 'scripts/check-template.mjs',
+    'scripts/version.mjs', 'scripts/release.mjs', 'scripts/templates/migration.md',
 ]);
 
 const SKIP_EXTENSIONS = /\.(png|jpe?g|gif|webp|avif|mp4|webm|zip|ico|woff2?)$/i;
@@ -200,6 +204,45 @@ if (manifestPath && !exists(join(root, manifestPath))) {
     problems.push(`pcfhub.json points control.manifestPath at "${manifestPath}", which does not exist.`);
 }
 
+/*
+ * Hosts against the docs on disk.
+ *
+ * The one host rule the hub cannot apply, and a good example of what this
+ * script is still for now that the manifest rules live on the hub: the hub
+ * validates a JSON document it was handed, and cannot see which files a
+ * repository ships.
+ *
+ * It matters because the two feed each other. A repository that declares no
+ * `hosts` has them derived from exactly these files, so a `docs/canvas.md` left
+ * behind by a template is a canvas claim nobody made — and a `hosts` naming
+ * canvas with no canvas page sends a reader from the docs nav to nothing.
+ *
+ * Warnings, not problems. Either state can be right briefly — a page being
+ * written, a host being added — and a check that fails a release over
+ * documentation one commit behind is a check people disable.
+ */
+if (Array.isArray(manifest.hosts)) {
+    for (const host of ['canvas', 'model-driven']) {
+        const claims = manifest.hosts.includes(host);
+        const documented = exists(join(root, 'docs', `${host}.md`));
+
+        if (claims && !documented) {
+            warnings.push(
+                `pcfhub.json declares the "${host}" host, but docs/${host}.md is missing. The hub `
+                + 'publishes a documentation section per host, and a reader who picks that tab gets nothing.',
+            );
+        }
+
+        if (!claims && documented) {
+            warnings.push(
+                `docs/${host}.md exists, but pcfhub.json does not list "${host}" in hosts. Every catalog `
+                + 'card says where a control runs, and this one will not say it runs there — add the host, '
+                + 'or delete the page.',
+            );
+        }
+    }
+}
+
 // ------------------------------------------------------- the control shape
 //
 // `control.type` and `control.framework` are the repository claiming what the
@@ -367,6 +410,49 @@ for (const controlDir of controlDirs) {
                 + 'hosts — canvas in a browser, a model-driven form on the web, and Power Pages, which '
                 + 'supports no Device API at all. Use required="false" and feature-detect unless the control '
                 + 'is nothing but this feature.',
+            );
+        }
+    }
+}
+
+// ---------------------------------------------- property names FormXML owns
+//
+// The classic form designer writes every configured property under the
+// cell's <parameters> as an element named after the property, and the
+// publish step scans the form's XML for <labels> elements to publish their
+// translations. So a property named `labels` turns `<labels>auto</labels>`
+// into a label owner, the publisher walks up to the cell's GUID, finds
+// `parameters` is not a node it knows, and publishing the form fails with
+// "XML node parameters is one that has an id of <guid> but is one that we
+// don't recognize as having a valid LabelTypeCode" — measured on the
+// Accounts form 2026-09-19 (pcf-chart-view 0.0.1). An entity view has no
+// FormXML, which is why the same control published on the grid and why the
+// failure looks like a subgrid problem. That one is a failure here.
+//
+// The other names are FormXML's own container elements. None has been seen
+// to break a publish — `label` (singular) ships on two controls and
+// publishes — so they warn rather than fail, and the warning says so.
+
+const FORMXML_FAILS = ['labels'];
+const FORMXML_WARNS = ['label', 'parameters', 'tabs', 'tab', 'columns', 'column', 'sections', 'section', 'rows', 'row', 'cell', 'control', 'events', 'event', 'header', 'footer', 'Navigation', 'displayConditions'];
+
+for (const controlDir of controlDirs) {
+    const relative = `${controlDir}/ControlManifest.Input.xml`;
+    const xml = readFileSync(join(root, relative), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+    const names = [...xml.matchAll(/<property(?:-set)?\s+name="([^"]+)"/g)].map((match) => match[1]);
+
+    for (const name of names) {
+        if (FORMXML_FAILS.includes(name)) {
+            problems.push(
+                `${relative} names a property "${name}", which is a FormXML element: the classic form designer ` +
+                'writes it under <parameters> and publishing the form fails with "…don\'t recognize as having a ' +
+                'valid LabelTypeCode" (measured 2026-09-19). Rename it — valueLabels, markLabels, anything FormXML does not own.',
+            );
+        } else if (FORMXML_WARNS.includes(name)) {
+            warnings.push(
+                `${relative} names a property "${name}", which is also a FormXML element. Only "labels" is known to ` +
+                'break publishing; this one has not been seen to, but the classic designer writes it under ' +
+                '<parameters> by that name, and a rename now is free.',
             );
         }
     }
@@ -680,6 +766,114 @@ if (fidelity && fidelity !== 'none' && exists(join(root, 'out'))) {
     }
 }
 
+/*
+ * The version, in every place the repository keeps one.
+ *
+ * `release-reusable.yml` already checks this — against every manifest in the
+ * tree *and* against `Solution.xml` — but it does so on a Windows runner,
+ * after the pack, on a tag that has already been pushed. So the failure mode
+ * it produces is: delete the tag locally and remotely, fix, retag. That is the
+ * same check, two seconds earlier, before any of that is possible.
+ *
+ * A failure rather than a warning, because a disagreement has no benign
+ * reading: one of the three files was edited and the others were not, and
+ * whichever way round that is, the next tag fails.
+ *
+ * `variants/` is excluded. Its manifests are donor sources pinned at 0.1.0 —
+ * where a scaffolded control starts — and `setup.mjs` deletes the directory on
+ * adoption anyway.
+ */
+const versions = new Map();
+
+if (exists(join(root, 'package.json'))) {
+    let declared = null;
+
+    try {
+        declared = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version ?? null;
+    } catch {
+        // An unparseable package.json fails the build long before this matters.
+    }
+
+    versions.set('package.json', declared);
+}
+
+for (const path of walk(root)) {
+    if (basename(path) !== 'ControlManifest.Input.xml' || path.split(/[\\/]/).includes('variants')) {
+        continue;
+    }
+
+    // Anchored to the <control> element: a manifest also carries a <resx>
+    // version and one per <platform-library>, and none of those is this.
+    const element = /<control\b[^>]*>/.exec(readFileSync(path, 'utf8'))?.[0] ?? '';
+
+    versions.set(
+        path.slice(root.length + 1).replace(/\\/g, '/'),
+        /\bversion\s*=\s*"([^"]*)"/.exec(element)?.[1] ?? null,
+    );
+}
+
+const solutionXml = findSolutionXml();
+
+if (solutionXml) {
+    versions.set(
+        solutionXml.slice(root.length + 1).replace(/\\/g, '/'),
+        /<Version>([^<]+)<\/Version>/.exec(readFileSync(solutionXml, 'utf8'))?.[1] ?? null,
+    );
+}
+
+const declaredVersions = [...new Set(versions.values())];
+
+if (versions.size > 1 && declaredVersions.length > 1) {
+    problems.push(
+        'The version disagrees across the files that carry it, so the next tag fails in CI:\n' +
+        [...versions].map(([where, value]) => `      ${String(value).padEnd(10)} ${where}`).join('\n') +
+        '\n    Fix with: npm run bump -- <version>',
+    );
+}
+
+/*
+ * The bundle against the Dataverse web-resource ceiling, when a build has run.
+ *
+ * Both CI workflows gate on this, and both need the Windows msbuild pack to
+ * have happened — so before this, the first time anyone saw the number was on
+ * a runner. The 90% line is the workflows' own: a bundle rarely grows in small
+ * steps, it grows when a library arrives, so the useful warning is the one
+ * before the step that would cross the line.
+ *
+ * A warning at 90% and a *problem* past the ceiling, matching the workflows.
+ * Note the figure here is usually the development bundle, which is roughly
+ * four times the packed one — so passing here is not a promise, and a warning
+ * here is worth checking against a real pack rather than acted on directly.
+ */
+const BUNDLE_LIMIT = 5 * 1024 * 1024;
+const controlsOut = join(root, 'out', 'controls');
+
+if (exists(controlsOut)) {
+    for (const entry of readdirSync(controlsOut)) {
+        const bundle = join(controlsOut, entry, 'bundle.js');
+
+        if (!exists(bundle)) {
+            continue;
+        }
+
+        const bytes = statSync(bundle).size;
+        const used = Math.round((bytes / BUNDLE_LIMIT) * 1000) / 10;
+
+        if (bytes > BUNDLE_LIMIT) {
+            problems.push(
+                `out/controls/${entry}/bundle.js is ${bytes} bytes, over the ${BUNDLE_LIMIT}-byte ` +
+                'Dataverse web-resource limit. It will not import into a default environment.',
+            );
+        } else if (used >= 90) {
+            warnings.push(
+                `out/controls/${entry}/bundle.js is at ${used}% of the ${BUNDLE_LIMIT}-byte web-resource ` +
+                'limit. Trim it before it stops importing — look for a dependency that could be ' +
+                'externalised or lazy-loaded. (This is likely the development bundle; confirm against a pack.)',
+            );
+        }
+    }
+}
+
 if (problems.length > 0) {
     console.error('');
     for (const problem of problems) {
@@ -699,6 +893,29 @@ console.log(
 );
 
 // ------------------------------------------------------------------ helpers
+
+/*
+ * The solution's own version lives at <solution-dir>/src/Other/Solution.xml,
+ * and the solution directory is named by the repository rather than fixed —
+ * `Solution` in the template, `CodeEditorSolution` in one adopted repo. Found
+ * by the `.cdsproj` beside it, the way `adopt.mjs` finds it.
+ */
+function findSolutionXml() {
+    for (const entry of readdirSync(root)) {
+        if (SKIP_DIRS.has(entry) || !exists(join(root, entry)) || !statSync(join(root, entry)).isDirectory()) {
+            continue;
+        }
+
+        const hasProject = readdirSync(join(root, entry)).some((file) => file.endsWith('.cdsproj'));
+        const xml = join(root, entry, 'src', 'Other', 'Solution.xml');
+
+        if (hasProject && exists(xml)) {
+            return xml;
+        }
+    }
+
+    return null;
+}
 
 function* walk(dir) {
     for (const entry of readdirSync(dir).sort()) {
