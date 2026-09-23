@@ -236,6 +236,173 @@ check('light forced on a dark app', resolveTheme('light', true), 'vs');
 check('a canvas formula with odd casing', resolveTheme(' Dark ', false), 'vs-dark');
 check('a value outside the enum behaves as auto', resolveTheme('sepia', true), 'vs-dark');
 
+/* ================================================================== schema */
+
+const { resolveSchemaSource, compileSchema, draftOf, readable, decodePointer } = load('schema');
+const { Validator } = require('@cfworker/json-schema');
+
+section('schema.ts — what the maker put in the schema box');
+
+check('blank is no schema', resolveSchemaSource('  '), { kind: 'none' });
+check('null is no schema', resolveSchemaSource(null), { kind: 'none' });
+check('a document is inline', resolveSchemaSource(' {"type":"object"} ').kind, 'inline');
+check('a name is a web resource', resolveSchemaSource('new_/schemas/order.json'), { kind: 'webResource', name: 'new_/schemas/order.json' });
+check('a leading slash and the folder are forgiven', resolveSchemaSource('/WebResources/new_/order.json'), { kind: 'webResource', name: 'new_/order.json' });
+check('a URL is refused, never fetched', resolveSchemaSource('https://example.com/s.json').kind, 'unsupported');
+check('a protocol-relative URL too', resolveSchemaSource('//example.com/s.json').kind, 'unsupported');
+check('a query string is refused', resolveSchemaSource('new_/s.json?v=2').kind, 'unsupported');
+check('climbing out of the folder is refused', resolveSchemaSource('new_/../s.json').kind, 'unsupported');
+
+section('schema.ts — the schema itself');
+
+check('not JSON is named', compileSchema('{"type": }').fault, 'notJson');
+check('an array is not a schema', compileSchema('[1]').fault, 'invalidSchema');
+check('comments in a schema file are fine', compileSchema('{\n  // orders\n  "type": "object"\n}').ok, true);
+const unresolved = compileSchema('{"$ref": "#/$defs/missing"}');
+check('an unresolved $ref is the schema\'s fault, found up front', unresolved.fault, 'invalidSchema');
+check('…and says which', unresolved.message, 'The schema refers to #/$defs/missing, which it does not contain');
+check('a draft-07 schema is read as draft 7', draftOf({ $schema: 'http://json-schema.org/draft-07/schema#' }), '7');
+check('draft-04 as 4', draftOf({ $schema: 'http://json-schema.org/draft-04/schema#' }), '4');
+check('nothing declared is 2020-12', draftOf({}), '2020-12');
+
+section('schema.ts — the library\'s report, as measured against 4.1.1');
+
+// Canary: the declared-property quirk this module filters. When a release
+// fixes it, this fails, and the filter in readable() can go.
+const quirk = new Validator({ properties: { id: { type: 'number' } }, additionalProperties: false }, '2020-12', false).validate({ id: 'x' });
+check('CANARY: a failing declared property is also reported as additional', quirk.errors.some((u) => u.keyword === 'false' && u.instanceLocation === '#/id'), true);
+check('…and readable() drops that, keeping the type fault', readable(quirk.errors).map((f) => f.message), ['Expected a number, found a string']);
+
+const units = (schema, doc) => new Validator(schema, '2020-12', false).validate(doc).errors;
+check('a genuinely extra property is named at its key',
+    readable(units({ properties: { id: {} }, additionalProperties: false }, { id: 1, zz: 2 })),
+    [{ path: ['zz'], message: 'Property "zz" is not allowed', atKey: true }]);
+check('anyOf says so once, not once per branch',
+    readable(units({ anyOf: [{ type: 'string' }, { type: 'null' }] }, 3)).map((f) => f.message), ['Does not match any of the allowed shapes']);
+check('oneOf with two matches', readable(units({ oneOf: [{ type: 'number' }, { minimum: 0 }] }, 3)).map((f) => f.message), ['Matches more than one of the allowed shapes']);
+check('if/then keeps the then fault, not the if wrapper',
+    readable(units({ if: { properties: { k: { const: 'a' } } }, then: { required: ['x'] } }, { k: 'a' })).map((f) => f.message), ['Missing required property "x"']);
+check('a $ref wrapper disappears behind its fault',
+    readable(units({ items: { $ref: '#/$defs/t' }, $defs: { t: { type: 'string' } } }, ['a', 2])),
+    [{ path: ['1'], message: 'Expected a string, found a number', atKey: false }]);
+check('items: false names the item', readable(units({ prefixItems: [{}], items: false }, [1, 2])).map((f) => f.message), ['This item is not allowed here']);
+check('a property name failing its pattern is marked at the key',
+    readable(units({ propertyNames: { pattern: '^[a-z]+$' } }, { Ab: 1 }))[0].atKey, true);
+check('two expected types read as a list', readable(units({ type: ['string', 'null'] }, 3))[0].message, 'Expected a string or null, found a number');
+check('enum lists the values', readable(units({ enum: ['a', 'b'] }, 'c'))[0].message, 'Must be one of "a", "b"');
+check('a long enum is cut at six', readable(units({ enum: [1, 2, 3, 4, 5, 6, 7] }, 0))[0].message, 'Must be one of 1, 2, 3, 4, 5, 6, …');
+check('an object property named "1" is still a property',
+    readable(units({ properties: { a: {} }, additionalProperties: false }, { 1: true }))[0].message, 'Property "1" is not allowed');
+check('range keywords state the rule, not the arithmetic',
+    [[{ minimum: 1 }, 0], [{ maximum: 1 }, 2], [{ exclusiveMinimum: 1 }, 1], [{ exclusiveMaximum: 1.5 }, 2]].map(([s, d]) => readable(units(s, d))[0].message),
+    ['Must be at least 1', 'Must be at most 1', 'Must be greater than 1', 'Must be less than 1.5']);
+check('everything else keeps the library\'s sentence, tidied', readable(units({ minLength: 2 }, 'a'))[0].message, 'String is too short (1 < 2)');
+check('pointers decode ~1, ~0 and percent-encoding', decodePointer('#/a~1b/c%20d/~0x/0'), ['a/b', 'c d', '~x', '0']);
+check('the root pointer is the empty path', decodePointer('#'), []);
+
+section('schema.ts — faults, positioned in the document');
+
+const order = compileSchema(JSON.stringify({
+    type: 'object',
+    required: ['id', 'lines'],
+    properties: {
+        id: { type: 'number' },
+        lines: { type: 'array', items: { type: 'object', required: ['sku'], properties: { sku: { type: 'string' }, qty: { type: 'integer', minimum: 1 } } } },
+        status: { enum: ['open', 'closed'] }
+    },
+    additionalProperties: false
+}));
+check('the order schema compiles', order.ok, true);
+
+const orderDoc = '{\n  "id": "A-1",\n  "lines": [\n    { "sku": "x", "qty": 0 },\n    { "qty": 2 }\n  ],\n  "status": "void",\n  "note": 1\n}';
+const orderFaults = order.validate(orderDoc);
+check('one fault per real problem, in document order', orderFaults.map((p) => [p.line, p.column, p.message]), [
+    [2, 9, 'Expected a number, found a string'],
+    [4, 26, 'Must be at least 1'],
+    [5, 5, 'Missing required property "sku"'],
+    [7, 13, 'Must be one of "open", "closed"'],
+    [8, 3, 'Property "note" is not allowed']
+]);
+check('a scalar is marked across its whole value', orderFaults[0].length, '"A-1"'.length);
+check('a key-level fault covers the key with its quotes', orderFaults[4].length, '"note"'.length);
+check('a missing property marks the object\'s opening brace, one character', [orderFaults[2].column, orderFaults[2].length], [5, 1]);
+
+const missingRoot = order.validate('{\n  "id": 1\n}');
+check('a missing property on the root marks the root brace', missingRoot.map((p) => [p.line, p.column, p.length]), [[1, 1, 1]]);
+
+const wrongLines = order.validate('{ "id": 1, "lines": {\n  "a": 1\n} }');
+check('a container in the wrong shape is marked at its key, on one line', wrongLines.map((p) => [p.line, p.column, p.length, p.message]), [[1, 12, 7, 'Expected an array, found an object']]);
+
+check('a document that does not parse gets no schema faults', order.validate('{ "id": "A-1", }'), []);
+check('an empty column gets none either', order.validate(''), []);
+check('a valid document gets none', order.validate('{"id": 1, "lines": [{"sku": "a"}]}'), []);
+
+const crlfOrder = order.validate('{\r\n  "id": 1,\r\n  "lines": [],\r\n  "note": 2\r\n}');
+check('CRLF documents count lines the same', crlfOrder.map((p) => [p.line, p.column]), [[4, 3]]);
+
+const boolSchema = compileSchema('false');
+check('a false schema refuses everything, at the root', boolSchema.ok && boolSchema.validate('1').length, 1);
+
+/* =============================================================== formatXml */
+
+const { formatXml, readXml } = load('formatXml');
+const TWO = { tabSize: 2, insertSpaces: true, eol: '\n' };
+
+/** The tree with whitespace-only text dropped: what formatting must not change. */
+function shape(text) {
+    const walk = (nodes) => nodes
+        .filter((n) => !(n.type === 'text' && n.raw.trim() === ''))
+        .map((n) => n.type === 'element' ? { e: n.open, c: walk(n.children), x: n.close } : { [n.type]: n.raw });
+    const nodes = readXml(text);
+    return nodes ? JSON.stringify(walk(nodes)) : null;
+}
+
+section('formatXml.ts — re-indentation, and nothing else');
+
+const fetchXml = '<fetch top="5"><entity name="account"><attribute name="name"/>\n<filter type="and"><condition attribute="statecode" operator="eq" value="0"/></filter>\n<!-- recent first --><order attribute="createdon" descending="true"/></entity></fetch>';
+const fetchFormatted = formatXml(fetchXml, TWO);
+check('FetchXML lays out one element per line', fetchFormatted, [
+    '<fetch top="5">',
+    '  <entity name="account">',
+    '    <attribute name="name"/>',
+    '    <filter type="and">',
+    '      <condition attribute="statecode" operator="eq" value="0"/>',
+    '    </filter>',
+    '    <!-- recent first -->',
+    '    <order attribute="createdon" descending="true"/>',
+    '  </entity>',
+    '</fetch>'
+].join('\n'));
+check('…keeps its tree', shape(fetchFormatted), shape(fetchXml));
+check('formatting twice changes nothing', formatXml(fetchFormatted, TWO), fetchFormatted);
+
+const mixed = '<doc><p>Hello <b>big</b>  world</p><q>  spaced  </q></doc>';
+const mixedFormatted = formatXml(mixed, TWO);
+check('mixed content and text are written back exactly', mixedFormatted, '<doc>\n  <p>Hello <b>big</b>  world</p>\n  <q>  spaced  </q>\n</doc>');
+
+const preserve = '<a><pre xml:space="preserve">\n  <b/>\n</pre><c><d/></c></a>';
+check('xml:space="preserve" is left alone, and only there', formatXml(preserve, TWO), '<a>\n  <pre xml:space="preserve">\n  <b/>\n</pre>\n  <c>\n    <d/>\n  </c>\n</a>');
+
+const cdata = '<a><s><![CDATA[ x < y ]]></s></a>';
+check('CDATA is content: its element stays as written', formatXml(cdata, TWO), '<a>\n  <s><![CDATA[ x < y ]]></s>\n</a>');
+
+const prolog = '<?xml version="1.0" encoding="utf-8"?><!DOCTYPE r [<!ENTITY e "v">]><r><x a="1 > 0"/></r>\n';
+check('prolog, DOCTYPE with a subset, and a > inside an attribute', formatXml(prolog, TWO), '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE r [<!ENTITY e "v">]>\n<r>\n  <x a="1 > 0"/>\n</r>\n');
+
+check('tabs when the editor indents with tabs', formatXml('<a><b/></a>', { tabSize: 4, insertSpaces: false, eol: '\n' }), '<a>\n\t<b/>\n</a>');
+check('CRLF documents stay CRLF', formatXml('<a>\r\n<b/></a>', { tabSize: 2, insertSpaces: true }), '<a>\r\n  <b/>\r\n</a>');
+check('an empty element keeps its inside as it was', formatXml('<a><b> </b><c></c></a>', TWO), '<a>\n  <b> </b>\n  <c></c>\n</a>');
+check('a tag spanning lines is not rewritten', formatXml('<a><b\n   x="1"/></a>', TWO), '<a>\n  <b\n   x="1"/>\n</a>');
+
+check('mismatched tags: not formatted', formatXml('<a><b></a>', TWO), null);
+check('an unclosed element: not formatted', formatXml('<a><b/>', TWO), null);
+check('an unterminated comment: not formatted', formatXml('<a><!-- x </a>', TWO), null);
+
+const ribbon = '<RibbonDiffXml><CustomActions><CustomAction Id="a.b" Location="Mscrm.Form.account.MainTab.Save.Controls._children" Sequence="10"><CommandUIDefinition><Button Id="a.b.btn" Command="a.cmd" LabelText="$LocLabels:a.label" TemplateAlias="o1"/></CommandUIDefinition></CustomAction></CustomActions><Templates><RibbonTemplates Id="Mscrm.Templates"/></Templates><CommandDefinitions/><RuleDefinitions><TabDisplayRules/><DisplayRules/><EnableRules/></RuleDefinitions><LocLabels><LocLabel Id="a.label"><Titles><Title description="Go" languagecode="1033"/></Titles></LocLabel></LocLabels></RibbonDiffXml>';
+const ribbonFormatted = formatXml(ribbon, TWO);
+check('a ribbon definition keeps its tree', shape(ribbonFormatted), shape(ribbon));
+check('…and is stable', formatXml(ribbonFormatted, TWO), ribbonFormatted);
+
 /* ================================================================= verdict */
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
