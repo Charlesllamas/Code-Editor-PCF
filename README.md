@@ -1,5 +1,7 @@
 # Code-Editor/PCF
 
+> **The complete documentation is on PCFHub: <https://pcfhub.dev/components/pcf-code-editor>** — installation, configuration for model-driven and canvas apps, the API reference, examples, limitations and a live demo.
+
 ![A JSON document in the Code Editor with two faults marked, and the strip beneath it naming the first](media/screenshot.png)
 ## Synopsis
 
