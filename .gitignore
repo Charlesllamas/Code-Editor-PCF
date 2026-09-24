@@ -12,3 +12,6 @@
 # msbuild output directories
 /bin
 /obj
+# Release notes drafts: the tag message is the changelog
+.release-notes-*.md
+/.release-notes.md

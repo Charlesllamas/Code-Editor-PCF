@@ -263,13 +263,28 @@ canvas-only because binding one breaks the classic form's save.
   `dev/shots.mjs` driving headless Chrome at 2× over `dev/shots.html` —
   where it was a paragraph here, which is how a retake becomes archaeology.
 
+## The 1.3.0 walkthrough (cll365, Accounts form, 2026-09-23)
+
+1.3.0 imported over the 1.2.9 probe. All four the right way.
+
+- **W1 — the web-resource schema on the form.** `schema` =
+  `cll_/probe/order.schema.json`, the order document in the column: five
+  underlines, and the strip names *Schema cll_/probe/order.schema.json*.
+- **W2 — a verdict-only notify leaves the form clean.** The record
+  reloaded with that document and nothing typed: no unsaved changes. The
+  control notified (the verdict went from valid to five problems as the
+  schema landed) and handed the column back as it came, so the form counted
+  nothing.
+- **W3 — a missing schema names itself.** `schema` =
+  `cll_/probe/nope.json`: the strip reads *"Schema cll_/probe/nope.json not
+  found — check the name, and that it is published"*.
+- **W4 — Format on XML.** `fetchxml.xml` with `language` = `xml`: the
+  Format button laid it out.
+
 ## Not verified
 
 From 1.3.0:
 
-- **A verdict-only `notifyOutputChanged` on a model-driven form**: opening
-  a record whose document breaks its schema, typing nothing — the form
-  should stay clean (the column goes back unchanged).
 - **The outputs in a canvas app**: `isValid` driving a Save button's
   `DisplayMode`, including before the user types.
 
