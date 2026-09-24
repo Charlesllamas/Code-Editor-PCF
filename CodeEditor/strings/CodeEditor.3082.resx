@@ -198,7 +198,7 @@
     <value>Es válido</value>
   </data>
   <data name="IsValid_Desc_Key" xml:space="preserve">
-    <value>Verdadero cuando la validación no encontró problemas, o está desactivada.</value>
+    <value>Verdadero cuando la validación no encontró problemas y el esquema solicitado, si lo hay, está en vigor; falso mientras un esquema se carga, falta o está roto. Verdadero con la validación desactivada.</value>
   </data>
   <data name="ProblemCount_Display_Key" xml:space="preserve">
     <value>Número de problemas</value>

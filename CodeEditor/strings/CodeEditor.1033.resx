@@ -198,7 +198,7 @@
     <value>Is valid</value>
   </data>
   <data name="IsValid_Desc_Key" xml:space="preserve">
-    <value>True when validation found no problems, or is off.</value>
+    <value>True when validation found no problems and any schema asked for is in force; false while a schema is loading, missing or broken. True when validation is off.</value>
   </data>
   <data name="ProblemCount_Display_Key" xml:space="preserve">
     <value>Problem count</value>
