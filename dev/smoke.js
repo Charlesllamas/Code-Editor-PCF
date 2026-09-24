@@ -302,6 +302,88 @@ check('CRLF documents count lines the same', crlfOrder.map((p) => [p.line, p.col
 const boolSchema = compileSchema('false');
 check('a false schema refuses everything, at the root', boolSchema.ok && boolSchema.validate('1').length, 1);
 
+/* ============================================================ schemaLoader */
+
+const { loadWebResourceSchema, webResourceUrl, fromText, schemaStatusText, schemaWithholdsVerdict } = load('schemaLoader');
+
+section('schemaLoader.ts — a web resource, as the form answered it (SPEC.md P1–P2b)');
+
+check('the client URL is the base, trailing slash or not', webResourceUrl('cll_/probe/order.schema.json', 'https://org.crm.dynamics.com/'), 'https://org.crm.dynamics.com/WebResources/cll_/probe/order.schema.json');
+check('no client URL: root-relative, which P1 measured working too', webResourceUrl('cll_/a.json', null), '/WebResources/cll_/a.json');
+check('each segment is encoded, the slashes are not', webResourceUrl('cll_/my schemas/a#1.json', ''), '/WebResources/cll_/my%20schemas/a%231.json');
+
+/** A fetch that answers from a table and records what it was asked. */
+function stubFetch(table) {
+    const asked = [];
+    const fn = (url, init) => {
+        asked.push({ url, init });
+        const answer = table[url];
+        if (answer === 'offline') {
+            return Promise.reject(new TypeError('Failed to fetch'));
+        }
+        const { status, body } = answer || { status: 404, body: '' };
+        return Promise.resolve({ status, ok: status >= 200 && status < 300, text: () => Promise.resolve(body) });
+    };
+    fn.asked = asked;
+    return fn;
+}
+
+const ORDER_SCHEMA = '{"type":"object","required":["id"],"properties":{"id":{"type":"number"}}}';
+const base = 'https://org.crm.dynamics.com/WebResources/';
+const loaderFetch = stubFetch({
+    [base + 'cll_/order.json']: { status: 200, body: ORDER_SCHEMA },
+    [base + 'cll_/script.json']: { status: 200, body: 'function x() {}' },
+    [base + 'cll_/bad.json']: { status: 200, body: '{"$ref": "#/nope"}' },
+    [base + 'cll_/secret.json']: { status: 403, body: '' },
+    [base + 'cll_/boom.json']: { status: 500, body: '' },
+    [base + 'cll_/net.json']: 'offline',
+});
+
+async function loaderChecks() {
+    const ready = await loadWebResourceSchema('cll_/order.json', 'https://org.crm.dynamics.com', loaderFetch);
+    check('200 with a schema: ready, and it validates', [ready.state, ready.validate('{"id": "x"}').map((p) => p.message)], ['ready', ['Expected a number, found a string']]);
+    check('asked same-origin, and revalidated — cache-control: private lets the browser keep an old copy (P2b)', loaderFetch.asked[0].init, { credentials: 'same-origin', cache: 'no-cache' });
+    check('a 404 is not found — the body is empty, the status is all there is (P2)', (await loadWebResourceSchema('cll_/missing.json', 'https://org.crm.dynamics.com', loaderFetch)).state, 'notFound');
+    check('a 403 is denied, not missing', await loadWebResourceSchema('cll_/secret.json', 'https://org.crm.dynamics.com', loaderFetch), { state: 'denied', status: 403 });
+    check('any other failure keeps its status', await loadWebResourceSchema('cll_/boom.json', 'https://org.crm.dynamics.com', loaderFetch), { state: 'failed', status: 500 });
+    check('a rejected fetch is offline, and nothing throws', await loadWebResourceSchema('cll_/net.json', 'https://org.crm.dynamics.com', loaderFetch), { state: 'offline' });
+    check('a Script web resource holding script is not JSON', (await loadWebResourceSchema('cll_/script.json', 'https://org.crm.dynamics.com', loaderFetch)).state, 'notJson');
+    const bad = await loadWebResourceSchema('cll_/bad.json', 'https://org.crm.dynamics.com', loaderFetch);
+    check('a schema that cannot resolve its own $ref says so', [bad.state, bad.message], ['invalidSchema', 'The schema refers to #/nope, which it does not contain']);
+    check('an inline schema takes the same path, minus the fetch', fromText(ORDER_SCHEMA).state, 'ready');
+
+    section('schemaLoader.ts — what the strip says, per state');
+
+    const said = (status) => schemaStatusText(status);
+    check('no schema: nothing', said({ kind: 'none' }), null);
+    check('a URL: refused, as a fault', said({ kind: 'unsupported' }), { key: 'Status_SchemaUnsupported', args: [], failed: true });
+    check('loading names the resource', said({ kind: 'loading', name: 'cll_/a.json' }), { key: 'Status_SchemaLoading', args: ['cll_/a.json'], failed: false });
+    check('ready names it', said({ kind: 'loaded', name: 'cll_/a.json', load: ready }).key, 'Status_SchemaReady');
+    check('an inline schema is not given a name it does not have', said({ kind: 'loaded', name: null, load: fromText(ORDER_SCHEMA) }), { key: 'Status_SchemaInline', args: [], failed: false });
+    check('not found says to check the name and the publish', said({ kind: 'loaded', name: 'cll_/m.json', load: { state: 'notFound' } }), { key: 'Status_SchemaNotFound', args: ['cll_/m.json'], failed: true });
+    check('a failure carries its status', said({ kind: 'loaded', name: 'cll_/b.json', load: { state: 'failed', status: 500 } }).args, ['cll_/b.json', '500']);
+    check('inline and not JSON has its own sentence', said({ kind: 'loaded', name: null, load: fromText('{"a":') }).key, 'Status_SchemaInlineNotJson');
+    check('an invalid inline schema keeps the reason', said({ kind: 'loaded', name: null, load: fromText('{"$ref":"#/x"}') }).args, ['The schema refers to #/x, which it does not contain']);
+
+    section('schemaLoader.ts — isValid fails closed while the schema is not in force');
+
+    const withholds = (status) => schemaWithholdsVerdict(status);
+    check('no schema asked for: nothing withheld', withholds({ kind: 'none' }), false);
+    check('in force: nothing withheld', withholds({ kind: 'loaded', name: 'a', load: ready }), false);
+    check('loading, missing, offline, broken, refused: all withhold "valid"', [
+        { kind: 'loading', name: 'a' },
+        { kind: 'loaded', name: 'a', load: { state: 'notFound' } },
+        { kind: 'loaded', name: 'a', load: { state: 'offline' } },
+        { kind: 'loaded', name: null, load: fromText('{"a":') },
+        { kind: 'unsupported' },
+    ].map(withholds), [true, true, true, true, true]);
+
+    const resx = (lcid) => require('fs').readFileSync(path.join(root, 'CodeEditor', 'strings', 'CodeEditor.' + lcid + '.resx'), 'utf8');
+    const keys = ['Status_SchemaUnsupported', 'Status_SchemaLoading', 'Status_SchemaReady', 'Status_SchemaInline', 'Status_SchemaNotFound', 'Status_SchemaDenied',
+        'Status_SchemaFailed', 'Status_SchemaOffline', 'Status_SchemaNotJson', 'Status_SchemaInlineNotJson', 'Status_SchemaInvalid', 'Status_SchemaInlineInvalid'];
+    check('every key the strip can ask for is in both languages', ['1033', '3082'].map((l) => keys.filter((k) => !resx(l).includes('name="' + k + '"'))), [[], []]);
+}
+
 /* =============================================================== formatXml */
 
 const { formatXml, readXml } = load('formatXml');
@@ -364,5 +446,12 @@ check('…and is stable', formatXml(ribbonFormatted, TWO), ribbonFormatted);
 
 /* ================================================================= verdict */
 
-console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
-process.exit(failed === 0 ? 0 : 1);
+loaderChecks().then(verdict, (error) => {
+    check('the asynchronous checks ran to the end', String(error && error.stack || error), '');
+    verdict();
+});
+
+function verdict() {
+    console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
+    process.exit(failed === 0 ? 0 : 1);
+}

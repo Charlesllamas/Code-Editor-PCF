@@ -116,6 +116,65 @@
     margin-right: 6px;
 }
 
+/*
+ * The message and the count are two boxes, because at a form's usual width
+ * the ellipsis ate "(+4 more)" — the part that says the first fault is not
+ * the only one (seen in the 1.3.0 screenshot). The message shrinks; the count
+ * does not.
+ */
+.CodeEditor-problem {
+    display: inline-flex;
+    align-items: center;
+}
+
+.CodeEditor-problem-text {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.CodeEditor-problem-more {
+    flex: 0 0 auto;
+    margin-left: 4px;
+}
+
+/*
+ * Which schema is in force, or why none is. It gives way before the problem
+ * does: the problem is what the author came to read, the schema's name is
+ * context, so it shrinks first and is capped at a third of the strip.
+ */
+.CodeEditor-schema {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 33%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.8;
+}
+
+/*
+ * A schema that could not be had is not context, it is the news: with no
+ * problem to show it would otherwise sit capped at a third of the strip,
+ * truncated mid-sentence beside an empty stretch (seen in the harness).
+ */
+.CodeEditor-schema--failed {
+    flex: 1 1 auto;
+    max-width: none;
+    opacity: 1;
+    color: #c50f1f;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-schema--failed {
+    color: #f1707b;
+}
+
+.CodeEditor-schema--failed::before {
+    content: "\26A0\FE0E";
+    margin-right: 6px;
+}
+
 .CodeEditor-format {
     flex: 0 0 auto;
     margin-left: auto;

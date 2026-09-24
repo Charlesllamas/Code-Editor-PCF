@@ -1,6 +1,6 @@
 {
   "name": "code-editor-pcf",
-  "version": "1.2.9",
+  "version": "1.3.0",
   "description": "Edit JSON, XML and other code in a multiline text column, with Monaco.",
   "scripts": {
     "check": "node scripts/check-template.mjs",
@@ -13,7 +13,8 @@
     "smoke": "node dev/smoke.js",
     "harness": "node dev/serve.js",
     "bump": "node scripts/version.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "shots": "node dev/shots.mjs"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",

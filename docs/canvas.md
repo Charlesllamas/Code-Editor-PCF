@@ -54,6 +54,29 @@ in the editor**. That is deliberate — see [Limitations](limitations) — and i
 resolves as soon as focus leaves the control. In practice a gallery selection
 moves focus out of the editor anyway.
 
+## Checking against a schema, and refusing to save
+
+In a canvas app the schema is passed as text — a formula, a variable, or a
+column holding it — rather than as a web resource name:
+
+```powerapps title="JSON schema property"
+"{ ""type"": ""object"", ""required"": [""id""], ""properties"": { ""id"": { ""type"": ""number"" } } }"
+```
+
+The control reports what it found, and the save is yours to gate:
+
+```powerapps title="DisplayMode of the Save button"
+If(CodeEditor1.isValid, DisplayMode.Edit, DisplayMode.Disabled)
+```
+
+```powerapps title="Text of a label beside it"
+If(CodeEditor1.isValid, "Ready to save", CodeEditor1.problemCount & " problem(s)")
+```
+
+`isValid` is false while any problem is marked, and also while a schema that
+was asked for is not in force — a broken schema, say — because the document
+has not been checked against it. With **Validation** off it is always true.
+
 ## Other rough edges
 
 - The editor fills the box you give it. A short box gets a short editor with its

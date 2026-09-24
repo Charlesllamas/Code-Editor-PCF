@@ -65,7 +65,24 @@ to off, and a blank `height` is the 500 pixels earlier releases hard-wired.
 | `validation` | `on`, `off` | JSON and XML. `off` for a column that holds JSON with comments. |
 
 The strip beneath the editor is not a property; it shows the resolved language,
-the first fault when there is one, and **Format** for JSON.
+the first fault when there is one, the schema in force (or why none is), and
+**Format** for JSON and XML.
+
+## The 1.3.0 properties
+
+One input and two outputs, all optional, so a form configured for 1.2.0
+upgrades without a change: a blank `schema` checks syntax only, as before.
+
+| Property | Usage | What it is |
+|---|---|---|
+| `schema` | input | The name of a web resource holding a JSON Schema — `new_/schemas/order.json` — or, in a canvas app, the schema itself as text starting with `{`. A URL is refused rather than fetched. |
+| `isValid` | output | True when validation found no problems — **and** any schema asked for is in force. False while a schema is loading, missing or broken. True with validation off. |
+| `problemCount` | output | How many problems were found, syntax or schema. 0 with validation off. |
+
+A schema is stored as a **Script (JScript)** web resource, because Dataverse
+has no JSON type; the control reads the body as JSON whatever the server calls
+it. The outputs are for canvas apps — see [Limitations](limitations) before
+binding one on a model-driven form.
 
 Both properties are live. Changing either updates the open editor — the language
 re-colours the current document in place, and a changed value is written in
@@ -91,9 +108,10 @@ designer. Monaco's own interface is not localised by these.
 </external-service-usage>
 ```
 
-This declaration is accurate: Monaco is compiled into `bundle.js` and the control
-makes no outbound requests at runtime. It is also what keeps the control out of
-the premium classification.
+This declaration is accurate: Monaco is compiled into `bundle.js`, and the one
+request the control can make — reading a schema named as a web resource — goes
+to the environment's own `/WebResources/` path, on the page's own origin. It is
+also what keeps the control out of the premium classification.
 
 :::callout{type=info}
 In releases before the bundled build this declaration was wrong —
@@ -103,5 +121,7 @@ otherwise. If you are assessing an older version, treat it as requiring outbound
 access to that host.
 :::
 
-There is no `feature-usage` block. The control uses neither the Web API nor any
-device capability, which keeps it usable where those are restricted.
+There is no `feature-usage` block, so the import asks for nothing. The control
+uses neither the Web API nor any device capability — a web resource is an
+ordinary same-origin read, which needs no declared feature (measured on a
+form, 2026-09-23).

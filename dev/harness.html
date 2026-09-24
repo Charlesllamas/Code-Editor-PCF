@@ -211,6 +211,21 @@
                 </select>
             </label>
 
+            <label>
+                JSON schema
+                <select id="harness-schema">
+                    <option value="none">blank</option>
+                    <option value="webResource">web resource, published (200)</option>
+                    <option value="missing">web resource, missing (404)</option>
+                    <option value="offline">web resource, offline (fetch rejects)</option>
+                    <option value="slow">web resource, still loading</option>
+                    <option value="inline">inline (canvas formula)</option>
+                    <option value="url">a URL (refused)</option>
+                </select>
+            </label>
+
+            <button type="button" id="harness-order">Put an order in the column</button>
+            <button type="button" id="harness-fetchxml">Put FetchXML in the column</button>
             <button type="button" id="harness-break">Put a fault in the column</button>
 
             <button type="button" id="harness-empty">Clear the column</button>

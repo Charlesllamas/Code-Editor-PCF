@@ -192,7 +192,7 @@
     <value>Esquema JSON</value>
   </data>
   <data name="Schema_Desc_Key" xml:space="preserve">
-    <value>Un JSON Schema con el que comprobar el documento: el propio esquema, empezando por {, o el nombre de un recurso web de este entorno, como new_/schemas/order.json. En blanco solo se comprueba la sintaxis.</value>
+    <value>El nombre de un recurso web con un JSON Schema, como new_/schemas/order.json, con el que comprobar el documento. En una aplicación de lienzo se puede pasar el propio esquema, empezando por {. En blanco solo se comprueba la sintaxis.</value>
   </data>
   <data name="IsValid_Display_Key" xml:space="preserve">
     <value>Es válido</value>
@@ -205,5 +205,41 @@
   </data>
   <data name="ProblemCount_Desc_Key" xml:space="preserve">
     <value>Cuántos problemas encontró la validación; 0 cuando está desactivada.</value>
+  </data>
+  <data name="Status_SchemaLoading" xml:space="preserve">
+    <value>Cargando el esquema {0}…</value>
+  </data>
+  <data name="Status_SchemaReady" xml:space="preserve">
+    <value>Esquema {0}</value>
+  </data>
+  <data name="Status_SchemaInline" xml:space="preserve">
+    <value>Esquema en línea</value>
+  </data>
+  <data name="Status_SchemaNotFound" xml:space="preserve">
+    <value>No se encontró el esquema {0}: compruebe el nombre y que esté publicado</value>
+  </data>
+  <data name="Status_SchemaDenied" xml:space="preserve">
+    <value>Sin acceso al esquema {0}</value>
+  </data>
+  <data name="Status_SchemaFailed" xml:space="preserve">
+    <value>No se pudo cargar el esquema {0} ({1})</value>
+  </data>
+  <data name="Status_SchemaOffline" xml:space="preserve">
+    <value>No se pudo cargar el esquema {0}</value>
+  </data>
+  <data name="Status_SchemaNotJson" xml:space="preserve">
+    <value>El esquema {0} no es JSON válido</value>
+  </data>
+  <data name="Status_SchemaInlineNotJson" xml:space="preserve">
+    <value>El esquema en línea no es JSON válido</value>
+  </data>
+  <data name="Status_SchemaInvalid" xml:space="preserve">
+    <value>Esquema {0}: {1}</value>
+  </data>
+  <data name="Status_SchemaInlineInvalid" xml:space="preserve">
+    <value>Esquema en línea: {0}</value>
+  </data>
+  <data name="Status_SchemaUnsupported" xml:space="preserve">
+    <value>El esquema debe ser el nombre de un recurso web o un documento JSON</value>
   </data>
 </root>

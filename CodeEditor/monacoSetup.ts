@@ -6,6 +6,7 @@ import * as monaco from "monaco-editor/editor/editor.api";
 import "./monacoFeatures";
 import { format as formatJson, applyEdits } from "jsonc-parser";
 import { resolveLanguage as resolve } from "./languages";
+import { formatXml } from "./formatXml";
 
 // Registering a language gives monaco its id, extensions and aliases, and wires
 // a lazy tokens-provider factory. Under PCF's single-chunk build that factory
@@ -128,6 +129,24 @@ monaco.languages.registerDocumentFormattingEditProvider("json", {
         // jsonc-parser's per-gap list, and undo treats it as one step.
         const formatted = applyEdits(text, edits);
         if (formatted === text) {
+            return [];
+        }
+        return [{ range: model.getFullModelRange(), text: formatted }];
+    }
+});
+
+// Format Document for XML, through formatXml.ts: re-indentation of element-
+// only content, anything holding text written back as it was. A document it
+// cannot read comes back null and the command changes nothing.
+monaco.languages.registerDocumentFormattingEditProvider("xml", {
+    provideDocumentFormattingEdits(model, options) {
+        const text = model.getValue();
+        const formatted = formatXml(text, {
+            tabSize: options.tabSize,
+            insertSpaces: options.insertSpaces,
+            eol: model.getEOL()
+        });
+        if (formatted === null || formatted === text) {
             return [];
         }
         return [{ range: model.getFullModelRange(), text: formatted }];

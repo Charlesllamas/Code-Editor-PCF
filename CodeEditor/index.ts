@@ -4,8 +4,8 @@ import { displayName } from "./languages";
 import { hasValidator, Problem, validateJson, validateXml } from "./validate";
 import { resolveHeight, resolveWidth, STATUS_BAR_HEIGHT } from "./sizing";
 import { MonacoTheme, resolveTheme } from "./theme";
-// THROWAWAY: the 1.2.9 probe (SPEC.md P1–P6). Remove with probe.ts before 1.3.0.
-import * as probe from "./probe";
+import { resolveSchemaSource } from "./schema";
+import { fromText, loadWebResourceSchema, SchemaStatus, schemaStatusText, schemaWithholdsVerdict } from "./schemaLoader";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -23,10 +23,17 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private _problemButton: HTMLButtonElement;
     private _okLabel: HTMLSpanElement;
     private _formatButton: HTMLButtonElement;
+    private _schemaLabel: HTMLSpanElement;
 
     private _notifyOutputChanged: () => void;
     private _editor: monaco.editor.IStandaloneCodeEditor;
-    private _code: string | undefined;
+    /**
+     * What getOutputs hands back as the column. Null until the user types
+     * when the column was null: 1.3.0 notifies when the verdict changes, not
+     * only on a keystroke, and handing an untouched null column back as ""
+     * is a change the form would count.
+     */
+    private _code: string | null = null;
     private _language: string;
     private _theme: MonacoTheme | undefined;
     private _validate = true;
@@ -36,6 +43,14 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private _validateTimer: number | undefined;
     private _problems: Problem[] = [];
     private _getString: (key: string) => string;
+
+    /** The raw schema input last acted on; undefined until the first read. */
+    private _schemaRaw: string | null | undefined = undefined;
+    private _schema: SchemaStatus = { kind: "none" };
+    /** Bumped per schema read and on destroy: a load that lost the race is dropped. */
+    private _schemaToken = 0;
+    /** The verdict last handed to the host through getOutputs. */
+    private _verdict = { isValid: true, problemCount: 0 };
 
     /**
      * Used to initialize the control instance.
@@ -66,11 +81,11 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         // colouring at all.
         this.sizeContainer(context, null);
 
-        this._code = context.parameters.code.raw || "";
+        this._code = context.parameters.code.raw ?? null;
         this._language = resolveLanguage(context.parameters.language.raw);
 
         this._editor = monaco.editor.create(this._editorHost, {
-            value: this._code,
+            value: this._code ?? "",
             language: this._language,
             readOnly: this._readOnly,
             // The wrapper div owns the size; Monaco is told explicitly via layout().
@@ -98,8 +113,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         });
 
         this.layout(context);
+        this.readSchema(context);
         this.runValidate();
-        probe.park(context, this._editor, () => this.getOutputs());
     }
 
     /**
@@ -130,24 +145,27 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         // behind, and writing that back resets the cursor to the top of the
         // document on every key press.
         const model = this._editor.getModel();
-        const incoming = context.parameters.code.raw || "";
+        const incoming = context.parameters.code.raw ?? "";
         let valueChanged = false;
         if (model && incoming !== model.getValue() && !this._editor.hasTextFocus()) {
             this._suppressChange = true;
             model.setValue(incoming);
             this._suppressChange = false;
-            this._code = incoming;
+            this._code = context.parameters.code.raw ?? null;
             valueChanged = true;
         }
 
         this.layout(context);
 
-        if (languageChanged || valueChanged || previouslyValidating !== this._validate) {
+        // Read on every pass: the hub's demo changes inputs on a mounted
+        // control, and a canvas formula can change the schema at any time.
+        const schemaChanged = this.readSchema(context);
+
+        if (languageChanged || valueChanged || schemaChanged || previouslyValidating !== this._validate) {
             this.runValidate();
         } else {
             this.renderStatus();
         }
-        probe.park(context, this._editor, () => this.getOutputs());
     }
 
     /**
@@ -155,9 +173,10 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      */
     public getOutputs(): IOutputs {
         return {
-            code: this._code ?? "",
-            isValid: this._problems.length === 0,
-            problemCount: this._problems.length
+            // Null, never undefined, for a column nobody has typed in: see _code.
+            code: this._code ?? (null as unknown as string),
+            isValid: this._verdict.isValid,
+            problemCount: this._verdict.problemCount
         };
     }
 
@@ -165,6 +184,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      * Called when the control is to be removed from the DOM tree.
      */
     public destroy(): void {
+        this._schemaToken++;
         if (this._validateTimer !== undefined) {
             window.clearTimeout(this._validateTimer);
             this._validateTimer = undefined;
@@ -200,6 +220,43 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         // Global to the page -- see theme.ts.
         monaco.editor.setTheme(theme);
         this._root.dataset.theme = theme;
+    }
+
+    /**
+     * Act on the `schema` input when it changed. An inline schema compiles
+     * now; a web resource loads in the background and validates again when
+     * it lands — unless another read or destroy() came first. Returns whether
+     * anything changed, so updateView knows to validate.
+     */
+    private readSchema(context: ComponentFramework.Context<IInputs>): boolean {
+        const raw = context.parameters.schema?.raw ?? null;
+        if (raw === this._schemaRaw) {
+            return false;
+        }
+        this._schemaRaw = raw;
+        const token = ++this._schemaToken;
+        const source = resolveSchemaSource(raw);
+
+        switch (source.kind) {
+            case "none":
+            case "unsupported":
+                this._schema = { kind: source.kind };
+                break;
+            case "inline":
+                this._schema = { kind: "loaded", name: null, load: fromText(source.text) };
+                break;
+            case "webResource":
+                this._schema = { kind: "loading", name: source.name };
+                void loadWebResourceSchema(source.name, clientUrl(context), (url, init) => fetch(url, init)).then((load) => {
+                    if (token !== this._schemaToken) {
+                        return;
+                    }
+                    this._schema = { kind: "loaded", name: source.name, load };
+                    this.runValidate();
+                });
+                break;
+        }
+        return true;
     }
 
     /* -------------------------------------------------------------- size */
@@ -261,12 +318,38 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         })));
 
         this.renderStatus();
+
+        // The verdict is an output a canvas app can act on (a Save button's
+        // DisplayMode), so it is handed over when it changes — on a keystroke,
+        // a schema landing, or a switch — not only when the text does.
+        // Validation off is the neutral verdict: valid, 0. A schema asked for
+        // and not in force withholds "valid" (schemaWithholdsVerdict).
+        const verdict = {
+            isValid: this._problems.length === 0 && !this.schemaWithheld(),
+            problemCount: this._problems.length
+        };
+        if (verdict.isValid !== this._verdict.isValid || verdict.problemCount !== this._verdict.problemCount) {
+            this._verdict = verdict;
+            this._notifyOutputChanged();
+        }
+    }
+
+    /** The schema applies to JSON with validation on; elsewhere it withholds nothing. */
+    private schemaWithheld(): boolean {
+        return this._validate && this._language === "json" && schemaWithholdsVerdict(this._schema);
     }
 
     private findProblems(text: string): Problem[] {
         switch (this._language) {
-            case "json":
-                return validateJson(text);
+            case "json": {
+                // Syntax first: a schema check against half a document is noise.
+                const syntax = validateJson(text);
+                if (syntax.length > 0) {
+                    return syntax;
+                }
+                const schema = this._schema;
+                return schema.kind === "loaded" && schema.load.state === "ready" ? schema.load.validate(text) : [];
+            }
             case "xml":
                 return validateXml(text, xmlParserError);
             default:
@@ -308,6 +391,10 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._okLabel.className = "CodeEditor-ok";
         this._okLabel.hidden = true;
 
+        this._schemaLabel = document.createElement("span");
+        this._schemaLabel.className = "CodeEditor-schema";
+        this._schemaLabel.hidden = true;
+
         this._formatButton = document.createElement("button");
         this._formatButton.type = "button";
         this._formatButton.className = "CodeEditor-format";
@@ -319,7 +406,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             void this._editor.getAction("editor.action.formatDocument")?.run();
         });
 
-        this._status.append(this._languageLabel, this._problemButton, this._okLabel, this._formatButton);
+        this._status.append(this._languageLabel, this._problemButton, this._okLabel, this._schemaLabel, this._formatButton);
         this._root.append(this._editorHost, this._status);
         this._container.appendChild(this._root);
     }
@@ -332,23 +419,45 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
 
         if (validating && first) {
             const more = this._problems.length - 1;
-            let text = `Ln ${first.line}, Col ${first.column}: ${first.message}`;
+            const message = document.createElement("span");
+            message.className = "CodeEditor-problem-text";
+            message.textContent = `Ln ${first.line}, Col ${first.column}: ${first.message}`;
+            const parts: HTMLElement[] = [message];
             if (more > 0) {
-                text += ` (${this.text("Status_More", String(more))})`;
+                const count = document.createElement("span");
+                count.className = "CodeEditor-problem-more";
+                count.textContent = `(${this.text("Status_More", String(more))})`;
+                parts.push(count);
             }
-            this._problemButton.textContent = text;
-            this._problemButton.title = this.text("Status_GoToProblem");
+            this._problemButton.replaceChildren(...parts);
+            // The whole first message, where the strip had to cut it.
+            this._problemButton.title = `${message.textContent} — ${this.text("Status_GoToProblem")}`;
             this._problemButton.hidden = false;
             this._okLabel.hidden = true;
         } else {
+            // "No problems" is a claim about the whole check; while the
+            // schema is loading or missing it would be a claim about half.
+            const claim = validating && !this.schemaWithheld();
             this._problemButton.hidden = true;
-            this._okLabel.textContent = validating ? this.text("Status_NoProblems") : "";
-            this._okLabel.hidden = !validating;
+            this._okLabel.textContent = claim ? this.text("Status_NoProblems") : "";
+            this._okLabel.hidden = !claim;
         }
 
         this._root.classList.toggle("CodeEditor--invalid", validating && !!first);
 
-        const canFormat = !this._readOnly && this._language === "json";
+        // The schema applies to JSON; under another language it says nothing.
+        const schema = validating && this._language === "json" ? schemaStatusText(this._schema) : null;
+        this._schemaLabel.hidden = schema === null;
+        this._schemaLabel.textContent = schema ? this.text(schema.key, ...schema.args) : "";
+        // The strip truncates; the whole sentence is one hover away.
+        this._schemaLabel.title = this._schemaLabel.textContent;
+        this._schemaLabel.classList.toggle("CodeEditor-schema--failed", !!schema?.failed);
+
+        // XML is formatted only when it is well-formed, so the button hides
+        // while validation is showing a fault; with validation off it shows,
+        // and a broken document is left as it is (formatXml declines).
+        const canFormat = !this._readOnly
+            && (this._language === "json" || (this._language === "xml" && !(validating && first)));
         this._formatButton.hidden = !canFormat;
         if (canFormat) {
             this._formatButton.textContent = this.text("Status_Format");
@@ -378,4 +487,19 @@ function xmlParserError(text: string): string | null {
     const doc = new DOMParser().parseFromString(text, "application/xml");
     const error = doc.getElementsByTagName("parsererror")[0];
     return error ? (error.textContent ?? "") : null;
+}
+
+/**
+ * The organisation URL, where the host offers one. `context.page` is not in
+ * the typings for a field control, and was there on a model-driven form
+ * (SPEC.md P1); without it the loader asks root-relative, which P1 measured
+ * working as well.
+ */
+function clientUrl(context: ComponentFramework.Context<IInputs>): string | null {
+    try {
+        const page = (context as unknown as { page?: { getClientUrl?: () => string } }).page;
+        return typeof page?.getClientUrl === "function" ? page.getClientUrl() : null;
+    } catch {
+        return null;
+    }
 }

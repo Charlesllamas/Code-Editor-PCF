@@ -1,0 +1,126 @@
+<!doctype html>
+<!--
+  One state of the control, alone on the page, for dev/shots.mjs to capture.
+
+  Not a harness: no switches, no outputs panel — the screenshot is the whole
+  page. `?state=` names the state; the table in shots.mjs says which exist.
+  The page registers ComponentFramework before the bundle's script, turns
+  transitions off so a capture never lands mid-fade, and hands the control
+  allocatedHeight -1 so `height` / `fitContent` decide the crop the way a
+  model-driven form does.
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Code Editor — shot</title>
+    <!--
+      The control's own stylesheet. The platform loads it from the manifest,
+      beside the bundle — the bundle carries only Monaco's CSS — so a page
+      that forgets it shows the strip as bare browser buttons, which is how
+      the first capture of this page came out.
+    -->
+    <link rel="stylesheet" href="../out/controls/CodeEditor/css/CodeEditor.css" />
+    <style>
+        html, body { margin: 0; padding: 0; background: transparent; }
+        body { padding: 12px; font-family: "Segoe UI", system-ui, sans-serif; }
+        * { transition: none !important; animation: none !important; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            var ORDER_SCHEMA = JSON.stringify({
+                type: 'object',
+                required: ['id', 'lines'],
+                properties: {
+                    id: { type: 'number' },
+                    lines: { type: 'array', items: { type: 'object', required: ['sku'], properties: { sku: { type: 'string' }, qty: { type: 'integer', minimum: 1 } } } },
+                    status: { enum: ['open', 'closed'] }
+                },
+                additionalProperties: false
+            });
+
+            var ORDER = '{\n  "id": "A-1",\n  "lines": [\n    { "sku": "x", "qty": 0 },\n    { "qty": 2 }\n  ],\n  "status": "void",\n  "note": 1\n}';
+
+            var CONFIG = '{\n  "publisher": "PCFHub",\n  "controls": [\n    { "name": "CodeEditor", "language": "json", "readOnly": false },\n    { "name": "Sparkline", "language": "xml", "readOnly": true }\n  ],\n  "notes": "Edited in a code component, saved to a multiline text column."\n}';
+
+            var FAULTS = '{\n  "publisher": "PCFHub",\n  "controls": [\n    { "name": "CodeEditor", "language": "json" },\n  ],\n  "notes": "a trailing comma above, and a comment below"\n  // not JSON\n}';
+
+            var XML = '<solution name="CodeEditor">\n  <control language="xml" theme="auto">\n    <property name="height">320</property>\n  </control>\n</solution>';
+
+            /* Each state: the column, the inputs, and the app theme. */
+            var STATES = {
+                faults: { code: FAULTS, language: 'json', theme: 'auto', height: 220, fit: false, dark: false },
+                dark: { code: CONFIG, language: 'json', theme: 'dark', height: 400, fit: true, dark: true },
+                xml: { code: XML, language: 'xml', theme: 'auto', height: 400, fit: true, dark: false },
+                schema: { code: ORDER, language: 'json', theme: 'auto', height: 250, fit: false, dark: false, schema: 'new_/schemas/order.json' }
+            };
+
+            var state = STATES[new URLSearchParams(location.search).get('state') || 'faults'];
+
+            /*
+             * The web resource, answered the way a form answered it (SPEC.md
+             * P1): 200, text/jscript. Immediately, so the capture's virtual
+             * time budget is spent rendering rather than waiting.
+             */
+            var realFetch = window.fetch.bind(window);
+            window.fetch = function (url, init) {
+                if (String(url).indexOf('/WebResources/') !== -1) {
+                    return Promise.resolve(new Response(ORDER_SCHEMA, { status: 200, headers: { 'content-type': 'text/jscript' } }));
+                }
+                return realFetch(url, init);
+            };
+
+            var registered = null;
+            window.ComponentFramework = { registerControl: function (name, ctor) { registered = ctor; } };
+
+            window.__shot = function (strings) {
+                var context = {
+                    parameters: {
+                        code: { raw: state.code, type: 'Multiple' },
+                        language: { raw: state.language },
+                        theme: { raw: state.theme },
+                        height: { raw: state.height },
+                        fitContent: { raw: state.fit },
+                        validation: { raw: 'on' },
+                        schema: { raw: state.schema || null }
+                    },
+                    fluentDesignLanguage: { isDarkTheme: state.dark, tokenTheme: {}, brand: {} },
+                    mode: {
+                        isVisible: true, isControlDisabled: false, label: 'Configuration',
+                        trackContainerResize: function () {}, setFullScreen: function () {},
+                        allocatedWidth: 616, allocatedHeight: -1
+                    },
+                    page: { getClientUrl: function () { return location.origin; } },
+                    resources: { getString: function (key) { return strings[key] || key; } },
+                    userSettings: { isRTL: false, languageId: 1033 },
+                    updatedProperties: []
+                };
+                var control = new registered();
+                control.init(context, function () {}, {}, document.getElementById('root'));
+                control.updateView(context);
+            };
+        })();
+    </script>
+    <script src="../out/controls/CodeEditor/bundle.js"></script>
+    <script>
+        fetch('../CodeEditor/strings/CodeEditor.1033.resx')
+            .then(function (r) { return r.text(); })
+            .then(function (xml) {
+                var strings = {};
+                var doc = new DOMParser().parseFromString(xml, 'application/xml');
+                Array.prototype.forEach.call(doc.getElementsByTagName('data'), function (node) {
+                    var value = node.getElementsByTagName('value')[0];
+                    if (value) {
+                        strings[node.getAttribute('name')] = value.textContent;
+                    }
+                });
+                window.__shot(strings);
+            });
+    </script>
+</body>
+</html>

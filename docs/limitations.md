@@ -39,16 +39,50 @@ XML document goes through the browser's own parser, which reports the first
 fault only, because that is what `DOMParser` reports. The other twelve
 languages are coloured and not checked.
 
-Two things this is not: it is not IntelliSense, so there is no completion in
-any language; and it is not schema validation, so a JSON document that is
-well-formed but wrong for your integration passes.
+It is not IntelliSense: there is no completion in any language.
 
-## Format is JSON only
+## Schema validation has edges
+
+From 1.3.0 a JSON document can be checked against a **JSON Schema** (drafts
+4, 7, 2019-09 and 2020-12), on the main thread like everything else here.
+What that does not cover:
+
+- **On a model-driven form the schema is a web resource.** The form
+  designer refuses a property value over 100 characters, which no real
+  schema fits, so paste-in-the-panel is not offered there. A web resource
+  name over 100 characters cannot be entered either.
+- **A web resource is read from the environment the form runs in.** A canvas
+  app runs elsewhere and passes the schema inline, as the text of a formula.
+- **Publish the web resource.** An edit reaches nobody until it is
+  published — a maker testing a saved-but-unpublished change sees the old
+  schema, the same as everyone else. (A resource never published at all is
+  served as saved.)
+- **`$ref` resolves inside the schema only.** `#/$defs/…` works; a
+  reference to another file or a URL does not, and the strip says the schema
+  refers to something it does not contain.
+- **Syntax comes first.** A document that does not parse is not checked
+  against the schema until it does; half a document would only produce noise.
+- **An empty column passes**, schema or not. Blank is a normal state for a
+  column; use a business rule if it must hold something.
+- **The messages are English**, for schema faults as for syntax faults.
+
+## Format covers JSON and XML
 
 **Format** in the strip, `Shift+Alt+F` and the context-menu entry all run the
-same formatter, and the control registers one for JSON only. It keeps comments
-and formats as much of a broken document as parses. XML and the rest have no
-formatter; the button is not shown for them.
+same formatter. For **JSON** it keeps comments and formats as much of a broken
+document as parses. For **XML** (from 1.3.0) it re-indents elements and does
+nothing else:
+
+- An element holding text or CDATA — `<value>  spaced  </value>`, mixed
+  content like `<p>Hello <b>big</b> world</p>` — is written back exactly as
+  it was, because in XML that whitespace can be data.
+- So is anything under `xml:space="preserve"`.
+- Tags are never rewritten: attribute order, quotes and line breaks inside a
+  tag stay yours.
+- A document that is not well-formed is not formatted at all; the button is
+  hidden while validation is showing a fault.
+
+Other languages have no formatter, and the button is not shown for them.
 
 ## Sizing depends on who has an opinion
 
@@ -88,11 +122,22 @@ consequence is that a change arriving while somebody is actively typing is
 dropped, and the editor resynchronises the next time it loses and regains the
 value.
 
-## It cannot block a save
+## It cannot block a save on a form
 
-The Power Apps component framework does not let a control cancel a save, so an
-invalid document saves like any other value. The marker and the strip make the
-fault visible; they do not make it impossible.
+The Power Apps component framework does not let a control cancel a save, so on
+a model-driven form an invalid document saves like any other value. The marker
+and the strip make the fault visible; they do not make it impossible.
+
+**In a canvas app it can**, because the save is yours: from 1.3.0 the control
+reports `isValid` and `problemCount`, and a Save button whose `DisplayMode`
+reads `isValid` refuses an invalid document — see [Canvas apps](canvas).
+`isValid` **fails closed**: while a schema is loading, missing or broken it is
+false, because the document has not been checked against what you asked for.
+
+**Do not bind the outputs on a model-driven form.** The classic form designer
+offers to bind a column to them; saving the form after doing so fails with an
+unhelpful `[object XMLDocument]` alert (measured). The modern designer shows
+them as read-only labels and offers no binding.
 
 ## The bundle and the platform's size limit
 

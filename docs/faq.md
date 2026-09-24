@@ -69,9 +69,25 @@ Older releases did not check any of this.
 
 ## Can it stop an invalid document being saved?
 
-No. It marks the fault and names it, but the component framework gives a
-control no way to cancel a save. Validation that has to hold belongs in a
-synchronous plugin or a business rule.
+On a model-driven form, no. It marks the fault and names it, but the component
+framework gives a control no way to cancel a save. Validation that has to hold
+belongs in a synchronous plugin or a business rule.
+
+In a canvas app, yes: set the Save button's `DisplayMode` from
+`CodeEditor1.isValid`. See [Canvas apps](canvas).
+
+## Can it check my JSON against a schema?
+
+Yes, from 1.3.0. Put the schema in a **Script (JScript)** web resource,
+publish it, and set **JSON schema** to its name. In a canvas app, pass the
+schema itself as text. See [Model-driven apps](model-driven).
+
+## The strip says my schema was not found.
+
+Check the name — it is the web resource's full name, prefix and folders
+included, such as `new_/schemas/order.json` — and that the web resource is
+**published**. A name that exists but has never been published is served as
+saved; an edit to a published one is not served until you publish again.
 
 ## Why is my column not offered when I add the control?
 
@@ -99,7 +115,9 @@ two editors on one form share it.
 ## How do I format a document?
 
 Press **Format** in the strip, or `Shift+Alt+F`, or use **Format Document**
-from the right-click menu — all three run the same formatter. JSON only.
+from the right-click menu — all three run the same formatter. JSON and XML;
+XML is re-indented only, and an element holding text is left exactly as it
+was.
 
 ## Something is broken. Where do I report it?
 

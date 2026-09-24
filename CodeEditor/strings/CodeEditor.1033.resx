@@ -192,7 +192,7 @@
     <value>JSON schema</value>
   </data>
   <data name="Schema_Desc_Key" xml:space="preserve">
-    <value>A JSON Schema to check the document against: the schema itself, starting with {, or the name of a web resource in this environment, such as new_/schemas/order.json. Blank checks syntax only.</value>
+    <value>The name of a web resource holding a JSON Schema, such as new_/schemas/order.json, to check the document against. In a canvas app, the schema itself can be passed instead, starting with {. Blank checks syntax only.</value>
   </data>
   <data name="IsValid_Display_Key" xml:space="preserve">
     <value>Is valid</value>
@@ -205,5 +205,41 @@
   </data>
   <data name="ProblemCount_Desc_Key" xml:space="preserve">
     <value>How many problems validation found; 0 when it is off.</value>
+  </data>
+  <data name="Status_SchemaLoading" xml:space="preserve">
+    <value>Loading schema {0}…</value>
+  </data>
+  <data name="Status_SchemaReady" xml:space="preserve">
+    <value>Schema {0}</value>
+  </data>
+  <data name="Status_SchemaInline" xml:space="preserve">
+    <value>Inline schema</value>
+  </data>
+  <data name="Status_SchemaNotFound" xml:space="preserve">
+    <value>Schema {0} not found — check the name, and that it is published</value>
+  </data>
+  <data name="Status_SchemaDenied" xml:space="preserve">
+    <value>No access to schema {0}</value>
+  </data>
+  <data name="Status_SchemaFailed" xml:space="preserve">
+    <value>Schema {0} could not be loaded ({1})</value>
+  </data>
+  <data name="Status_SchemaOffline" xml:space="preserve">
+    <value>Schema {0} could not be loaded</value>
+  </data>
+  <data name="Status_SchemaNotJson" xml:space="preserve">
+    <value>Schema {0} is not valid JSON</value>
+  </data>
+  <data name="Status_SchemaInlineNotJson" xml:space="preserve">
+    <value>The inline schema is not valid JSON</value>
+  </data>
+  <data name="Status_SchemaInvalid" xml:space="preserve">
+    <value>Schema {0}: {1}</value>
+  </data>
+  <data name="Status_SchemaInlineInvalid" xml:space="preserve">
+    <value>Inline schema: {0}</value>
+  </data>
+  <data name="Status_SchemaUnsupported" xml:space="preserve">
+    <value>The schema must be a web resource name or a JSON document</value>
   </data>
 </root>

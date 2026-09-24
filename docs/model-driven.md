@@ -62,9 +62,38 @@ names the first with its line and column and counts the rest, and pressing it
 moves the caret there. Hovering a fault reads it in place, and `F8` walks
 them.
 
-**Format** in the strip tidies a JSON document with two-space indentation and
-keeps its comments; `Shift+Alt+F` and the right-click menu do the same. It is
-not shown for other languages or on a read-only column.
+**Format** in the strip tidies a JSON document and keeps its comments, and
+re-indents an XML document without touching its content; `Shift+Alt+F` and the
+right-click menu do the same. It is not shown for other languages or on a
+read-only column.
+
+### Checking against a JSON Schema
+
+:::steps
+1. In your solution, add a **web resource** of type **Script (JScript)** —
+   Dataverse has no JSON type — named, say, `new_/schemas/order.json`, holding
+   the schema. **Publish it.**
+2. On the form, set the Code Editor's **JSON schema** property to that name.
+3. Save and publish the form.
+:::
+
+::image{src=media/screenshot-schema.png alt="An order document checked against a web-resource schema: five faults underlined, the first named in the strip with a count of four more, and the schema's name beside it" zoom}
+
+A document that breaks the schema is marked like a syntax fault, each with
+its own message: *Expected a number, found a string*, *Missing required
+property "sku"*, *Property "note" is not allowed*. The strip names the schema
+in force; if it cannot be had — a misspelt name, a resource nobody published —
+the strip says so, and syntax checking carries on.
+
+The property panel accepts no more than 100 characters, so a schema cannot be
+pasted into it on a form: use a web resource. After editing the schema,
+**publish** again; an unpublished edit reaches nobody.
+
+:::callout{type=warning}
+Leave **Is valid** and **Problem count** unbound. They are outputs for canvas
+apps; the classic form designer offers to bind a column to them, and the form
+then fails to save.
+:::
 
 ## Theme
 

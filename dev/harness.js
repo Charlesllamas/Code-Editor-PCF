@@ -37,6 +37,75 @@
         '}',
     ].join('\n');
 
+    /*
+     * The probe's schema and document (SPEC.md, P5): five faults, one per
+     * rule the strip has to word — a type, a minimum, a missing property, an
+     * enum, and a property the schema does not allow.
+     */
+    var ORDER_SCHEMA = JSON.stringify({
+        type: 'object',
+        required: ['id', 'lines'],
+        properties: {
+            id: { type: 'number' },
+            lines: { type: 'array', items: { type: 'object', required: ['sku'], properties: { sku: { type: 'string' }, qty: { type: 'integer', minimum: 1 } } } },
+            status: { enum: ['open', 'closed'] },
+        },
+        additionalProperties: false,
+    }, null, 2);
+
+    var ORDER = [
+        '{',
+        '  "id": "A-1",',
+        '  "lines": [',
+        '    { "sku": "x", "qty": 0 },',
+        '    { "qty": 2 }',
+        '  ],',
+        '  "status": "void",',
+        '  "note": 1',
+        '}',
+    ].join('\n');
+
+    /**
+     * What each schema switch hands the control as `schema`, and how the
+     * web-resource fetch answers — as measured on a form (SPEC.md P1–P2b): a
+     * published resource is 200 `text/jscript`, a missing one a 404 with an
+     * empty body, and a rejected fetch is the network.
+     */
+    var SCHEMAS = {
+        none: { raw: null },
+        webResource: { raw: 'cll_/probe/order.schema.json', answer: { status: 200, body: ORDER_SCHEMA } },
+        missing: { raw: 'cll_/probe/missing.json', answer: { status: 404, body: '' } },
+        offline: { raw: 'cll_/probe/order.schema.json', answer: 'offline' },
+        slow: { raw: 'cll_/probe/order.schema.json', answer: 'never' },
+        inline: { raw: ORDER_SCHEMA },
+        url: { raw: 'https://example.com/order.schema.json' },
+    };
+
+    /*
+     * The page's own fetch, wrapped so a request for a web resource is
+     * answered by the switch above and everything else (the .resx) goes
+     * through. Installed once; the switch is read per request.
+     */
+    var realFetch = window.fetch.bind(window);
+    window.fetch = function (url, init) {
+        var path = String(url);
+        if (path.indexOf('/WebResources/') === -1) {
+            return realFetch(url, init);
+        }
+        var answer = SCHEMAS[document.getElementById('harness-schema').value].answer || { status: 404, body: '' };
+        if (answer === 'offline') {
+            return Promise.reject(new TypeError('Failed to fetch'));
+        }
+        if (answer === 'never') {
+            return new Promise(function () {});
+        }
+        return new Promise(function (resolve) {
+            window.setTimeout(function () {
+                resolve(new Response(answer.body, { status: answer.status, headers: { 'content-type': answer.status === 200 ? 'text/jscript' : 'text/html; charset=utf-8' } }));
+            }, 150);
+        });
+    };
+
     /**
      * `parameter.security`, and the shape matters.
      *
@@ -89,6 +158,7 @@
             prefHeight: pref === '' ? null : Number(pref),
             fitContent: document.getElementById('harness-fit').checked,
             validation: document.getElementById('harness-validation').value,
+            schema: document.getElementById('harness-schema').value,
         };
     }
 
@@ -105,7 +175,15 @@
                 height: { raw: o.prefHeight, type: 'Whole.None' },
                 fitContent: { raw: o.fitContent, type: 'TwoOptions' },
                 validation: { raw: o.validation, type: 'Enum' },
+                schema: { raw: SCHEMAS[o.schema].raw, type: 'SingleLine.Text' },
             },
+
+            /*
+             * Present on a model-driven form (SPEC.md P1) though absent from a
+             * field control's typings. The page's own origin, so the control's
+             * web-resource fetch lands on the stub above.
+             */
+            page: { getClientUrl: function () { return location.origin; } },
 
             /*
              * Withheld unless the app publishes one. A canvas app and the
@@ -273,6 +351,7 @@
             'harness-pref-height',
             'harness-fit',
             'harness-validation',
+            'harness-schema',
         ].forEach(function (id) {
             document.getElementById(id).addEventListener('change', mount);
         });
@@ -284,6 +363,19 @@
          */
         document.getElementById('harness-empty').addEventListener('click', function () {
             columnValue = '';
+            mount();
+        });
+
+        // The probe's order: valid JSON, five faults against the schema.
+        document.getElementById('harness-order').addEventListener('click', function () {
+            columnValue = ORDER;
+            mount();
+        });
+
+        // One line of FetchXML, the probe's P6 document: Format should lay it
+        // out one element per line and leave the comment where it was.
+        document.getElementById('harness-fetchxml').addEventListener('click', function () {
+            columnValue = '<fetch top="5"><entity name="account"><attribute name="name"/><filter type="and"><condition attribute="statecode" operator="eq" value="0"/></filter><!-- recent first --><order attribute="createdon" descending="true"/></entity></fetch>';
             mount();
         });
 

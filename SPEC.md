@@ -88,15 +88,10 @@ of the `default-value` finding above.
 
 ## Screenshots
 
-`media/screenshot*.png` come from a scratch page that mounts the control once
-with a named state and nothing else on the page, shot by headless Chrome at
-`--force-device-scale-factor=2`, `--window-size=640,<height>`,
-`--virtual-time-budget=4000`, `--default-background-color=00000000`. The
-page registers `ComponentFramework.registerControl` before the bundle's
-`<script>`, sets `* { transition: none !important }`, and hands the control
-`allocatedHeight: -1` so the `height`/`fitContent` branches decide the crop.
-States: `faults` (light, 220px, the two-fault document), `dark` (fit content,
-eight lines → 176px), `xml` (fit content, five lines → 119px).
+`npm run build && npm run shots` retakes every picture in `media/`; the
+states and their crops are the table at the top of `dev/shots.mjs`, and the
+page they are taken from is `dev/shots.html`. Look at each one before
+committing it.
 
 ## Measured on the form
 
@@ -151,9 +146,146 @@ column holding `order.document.json`.
 | P5 | `await p.schema()` — the five faults the suite expects (`Expected a number…` at 2:9, `Must be at least 1` at 4:26, `Missing required property "sku"` at 5:5, `Must be one of…` at 7:13, `Property "note" is not allowed` at 8:3), and **no CSP violation in the console**. | The validator library |
 | P6 | Set `language` = `xml`, paste `fetchxml.xml`; `p.xml()` → `sameTree` and `browserParses` both true; `p.applyXml()`, save, reload, `p.xml().changed` false. | XML Format |
 
-Answers: *pending.*
+### Answers (cll365, Accounts form, 2026-09-23)
+
+- **P1 — yes, both routes.** `context.page` is an object and
+  `getClientUrl` a function on this *standard* field control; it answered
+  `https://cll365.crm.dynamics.com`, the page's own origin (`/main.aspx`,
+  client `Web`, form factor 1). `fetch` of
+  `<clientUrl>/WebResources/cll_/probe/order.schema.json` → **200**, not
+  redirected, `content-type: text/jscript`, `cache-control: private`, all
+  499 bytes of the file, 166 ms; the root-relative `/WebResources/…` → the
+  same 200 and body, 80 ms. No `<uses-feature>` declared. The web-resource
+  route stays; the loader reads the body as JSON and ignores the type,
+  because a Script web resource says `text/jscript`. The new designer
+  accepted a `.json` name on a Script (JScript) web resource. The
+  `schema` input arrived as typed (`schemaRawLength` 28), resolved as
+  `webResource`.
+- **P2 — a missing name is a 404; an unpublished one is served.**
+  `cll_/probe/missing.json` → **404**, `content-type: text/html;
+  charset=utf-8`, **empty body**, both routes — so "not found" is the
+  status alone, and the loader names it from that, never from a body.
+  `cll_/probe/unpublished.json`, created and saved but **never published**
+  → **200**, `text/jscript`, its content (`{}`), both routes. Measured as
+  the environment's System Administrator; whether a user who cannot
+  customize is served the same is **unmeasured**, and the docs tell a maker
+  to publish rather than rely on it. P2b asks the sharper case.
+- **P2b — an unpublished edit is not served; the published copy is.** The
+  published `order.schema.json` edited (`"DRAFT"` added to the enum, 499 →
+  508 bytes) and saved without publishing: the probe's fetch answered 499,
+  and so did `fetch(…, { cache: "no-store" })`, which cannot come from the
+  browser's cache — the server hands out the published copy, to the System
+  Administrator too. With P2: a web resource never published is served as
+  saved (there is nothing else to serve); an edit reaches nobody until it
+  is published. **`cache-control: private` lets the browser keep a copy**,
+  so the loader fetches with `cache: "no-cache"` — revalidated every load,
+  so a newly published schema reaches the next form load rather than
+  whenever the browser's heuristic expires.
+- **P3 — the modern form designer refuses a static value over 100
+  characters.** Pasting the 3,967-character schema into *JSON schema →
+  Static value*: the field turns red, *"The json schema property cannot be
+  more than 100 characters"*, and the form cannot be saved with it. So on a
+  model-driven form **the schema is a web resource name**; inline is not
+  advertised there (a `{"type":"object"}` fits, and no real schema does),
+  and a web resource name over 100 characters cannot be entered either. A
+  canvas app sets the input by formula, where no such ceiling was seen —
+  inline is the canvas route. The same panel offers **Bind to table
+  column** for the input, which would give a schema per record from a text
+  column: not tried, listed under *Not verified*.
+- **P4 — the outputs import and run; the classic designer offers to bind
+  them.** Imported over 1.2.0 with `isValid` and `problemCount` declared,
+  the form loads and the control reports them (`{ isValid: true,
+  problemCount: 0 }` on the faulty document and on `{}` — the probe counts
+  syntax faults only). The modern designer shows both as read-only labels.
+  **The classic designer's Controls tab lists them with a pencil**, types
+  shown (`Whole.None`, *"How many problems validation found; 0 when it is
+  off."*) — a maker can bind a column to an output there, and what the
+  platform does with that on a model-driven form is P4b. Also seen: the
+  bound column comes back with `\r\n` line endings (the suite's CRLF cases
+  cover the positions).
+- **P4b — binding an output to a column breaks the classic form's save.**
+  `Is valid` bound to a Yes/No column on the classic designer's Controls
+  tab, then Save: a browser alert, *"cll365.crm.dynamics.com says
+  [object XMLDocument]"* — the designer's error path stringifying the
+  server's XML reply — and the form was not saved. So an output is **not**
+  a way to store the result on a model-driven form, and the docs say not to
+  bind one there; the modern designer, the default, shows outputs as labels
+  and offers no binding at all. The outputs stay: they exist for canvas,
+  and nothing offered on model-driven depended on the binding.
+- **P5 — the validator runs on the form, and matches the suite exactly.**
+  `order.document.json` against the web-resource schema: the five faults
+  the suite asserts, same line, column, length and wording (2:9 ×5, 4:26
+  ×1, 5:5 ×1, 7:13 ×6, 8:3 ×6), in **2 ms**, on a column the form stored
+  with `\r\n`. And the policy question behind the library choice:
+  `new Function("return 1")()` **is allowed** on this form — the default
+  model-driven CSP is `script-src * 'unsafe-inline' 'unsafe-eval' blob:`
+  (Learn, *Content security policy*, read 2026-09-23). But the admin
+  centre's **Strict CSP** drops `unsafe-eval` for model-driven apps
+  (`script-src 'self' blob: <platform>`), and there a code-generating
+  validator stops working while this one does not. The choice stands, for a
+  reason now written down rather than assumed.
+- **P6 — XML Format round-trips through a save.** `fetchxml.xml` (one
+  line) in the column with `language` = `xml`: `formattable`, `changed`,
+  `sameTree` and `browserParses` all true — the formatter's tree equals the
+  original's and the browser's own `DOMParser` accepts the result.
+  Written into the editor, saved, reloaded: `changed` is **false**, so the
+  saved value is the formatted one and formatting it again is a no-op.
+
+Nothing was cut. Every feature 1.3.0 rests on answered the right way, and
+three answers shaped it: the loader ignores `text/jscript` and
+revalidates (`no-cache`), the schema is a web resource name on a
+model-driven form and inline in canvas, and an output is documented as
+canvas-only because binding one breaks the classic form's save.
+
+## What building 1.3.0 found
+
+- **`isValid` fails closed.** The harness showed a missing schema beside
+  "No problems" and `isValid: true` — a canvas Save button would have
+  enabled on a document nobody checked against what the maker asked for.
+  So a schema asked for and not in force (loading, missing, refused,
+  broken) withholds "valid" (`schemaWithholdsVerdict`), "No problems" is not
+  claimed while it does, and `problemCount` still counts only what was
+  found.
+- **The outputs are notified when the verdict changes**, not only on a
+  keystroke — so the column is handed back as `null`, never `""`, while
+  nobody has typed in a null column: an untouched record must not look
+  edited. Whether a verdict-only notify leaves a model-driven form clean
+  is under *Not verified*.
+- **The screenshot found two strip defects the suite could not.** A failed
+  schema's sentence was capped at a third of the strip and cut mid-word
+  beside empty space (a failure is the news, so it now takes the room); and
+  at a form's usual width the ellipsis ate "(+4 more)", the part that says
+  the first fault is not the only one — the message and the count are two
+  boxes now, and only the message shrinks. The first capture also came out
+  unstyled: the platform loads the control's CSS from the manifest, so the
+  shot page has to link it.
+- **The screenshot recipe is a script now** — `npm run shots [state…]`,
+  `dev/shots.mjs` driving headless Chrome at 2× over `dev/shots.html` —
+  where it was a paragraph here, which is how a retake becomes archaeology.
 
 ## Not verified
+
+From 1.3.0:
+
+- **A verdict-only `notifyOutputChanged` on a model-driven form**: opening
+  a record whose document breaks its schema, typing nothing — the form
+  should stay clean (the column goes back unchanged).
+- **The outputs in a canvas app**: `isValid` driving a Save button's
+  `DisplayMode`, including before the user types.
+
+From the 1.2.9 probe:
+
+- **`schema` bound to a table column** (the designer's *Bind to table
+  column*): a schema per record, and past the 100-character static ceiling
+  — offered by the panel, never tried.
+- **A web resource read from a canvas app.** P1 was a model-driven form on
+  the environment's own origin; a canvas app runs elsewhere, and the docs
+  give it the inline route only.
+- **An unpublished web resource served to a user who cannot customize**
+  (P2 was measured as System Administrator).
+- **A classic-designer publish with the outputs declared and unbound.**
+  P4b's bound save failed; whether the plain classic Save + Publish went
+  through before it was not reported. The modern designer published.
 
 What the 1.1.9 probe left open. None of it holds the release.
 

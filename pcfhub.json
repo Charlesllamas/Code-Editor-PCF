@@ -4,7 +4,10 @@
   "name": "Code Editor",
   "tagline": "Edit JSON, XML and other code in a multiline text column, with Monaco.",
   "category": "text-editors",
-  "hosts": ["canvas", "model-driven"],
+  "hosts": [
+    "canvas",
+    "model-driven"
+  ],
   "tags": [
     "typescript",
     "localised",
@@ -32,6 +35,7 @@
     "logo": "media/logo.png",
     "screenshots": [
       "media/screenshot.png",
+      "media/screenshot-schema.png",
       "media/screenshot-dark.png",
       "media/screenshot-xml.png"
     ]
@@ -59,7 +63,8 @@
           "theme": "auto",
           "height": 320,
           "fitContent": false,
-          "validation": "on"
+          "validation": "on",
+          "schema": ""
         },
         "isDefault": true
       },
@@ -73,7 +78,22 @@
           "theme": "auto",
           "height": 320,
           "fitContent": false,
-          "validation": "on"
+          "validation": "on",
+          "schema": ""
+        }
+      },
+      {
+        "slug": "schema",
+        "name": "Against a JSON Schema",
+        "description": "Well-formed JSON that breaks its schema five ways — a type, a minimum, a missing property, an enum and an extra property — each marked and worded. On a form the schema is a web resource; here it is passed inline, as a canvas app would.",
+        "props": {
+          "code": "{\n  \"id\": \"A-1\",\n  \"lines\": [\n    { \"sku\": \"x\", \"qty\": 0 },\n    { \"qty\": 2 }\n  ],\n  \"status\": \"void\",\n  \"note\": 1\n}",
+          "language": "json",
+          "theme": "auto",
+          "height": 320,
+          "fitContent": false,
+          "validation": "on",
+          "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\"},\"lines\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\"},\"qty\":{\"type\":\"integer\",\"minimum\":1}}}},\"status\":{\"enum\":[\"open\",\"closed\"]}},\"additionalProperties\":false}"
         }
       },
       {
@@ -86,7 +106,8 @@
           "theme": "dark",
           "height": 400,
           "fitContent": true,
-          "validation": "on"
+          "validation": "on",
+          "schema": ""
         }
       },
       {
@@ -99,9 +120,13 @@
           "theme": "auto",
           "height": 320,
           "fitContent": false,
-          "validation": "on"
+          "validation": "on",
+          "schema": ""
         }
       }
+    ],
+    "limitations": [
+      "The schema is passed inline here; on a model-driven form it is a web resource, which the demo has none of. The isValid and problemCount outputs are reported but nothing in the demo consumes them."
     ]
   }
 }
