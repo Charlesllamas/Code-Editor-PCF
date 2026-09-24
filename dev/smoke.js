@@ -16,8 +16,9 @@
  * So the control keeps its decisions in modules that import nothing of
  * Monaco — `languages.ts`, `validate.ts`, `sizing.ts`, `theme.ts` — and
  * `index.ts` is the thin part that turns a decision into a Monaco call. This
- * file transpiles those modules with the TypeScript already in
- * devDependencies and drives them directly. What it proves is the decision;
+ * file loads those modules through `dev/modules.js`, which transpiles them
+ * with the TypeScript already in devDependencies, and drives them directly.
+ * The template took that loader from here. What it proves is the decision;
  * what it cannot prove is that `index.ts` asked the right question, and that
  * half stays with `dev/harness.html` and SPEC.md's *Not verified*.
  *
@@ -31,61 +32,19 @@
 
 'use strict';
 
-const fs = require('fs');
 const path = require('path');
-const Module = require('module');
-const ts = require('typescript');
+const { createLoader } = require('./modules');
 
 const root = path.join(__dirname, '..');
-const src = path.join(root, 'CodeEditor');
 
-/* ------------------------------------------------------------ load a module */
-
-/**
- * Transpile one source file to CommonJS and evaluate it as a module of its
- * own, so `require('./languages')` inside `validate.ts` resolves to the same
- * treatment. `jsonc-parser` is a real dependency and resolves from
- * node_modules the ordinary way.
+/*
+ * The shared loader (dev/modules.js, from the template): each decision module
+ * transpiled on its own, relative imports routed back through it, and a
+ * decision module that imports Monaco refused by name — so the boundary this
+ * suite rests on is enforced rather than remembered. `jsonc-parser` and
+ * `@cfworker/json-schema` are real dependencies and resolve the ordinary way.
  */
-const cache = new Map();
-
-function load(name) {
-    if (cache.has(name)) {
-        return cache.get(name).exports;
-    }
-
-    const file = path.join(src, name + '.ts');
-    const source = fs.readFileSync(file, 'utf8');
-    const { outputText, diagnostics } = ts.transpileModule(source, {
-        fileName: file,
-        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, esModuleInterop: true },
-        reportDiagnostics: true,
-    });
-
-    if (diagnostics && diagnostics.length > 0) {
-        throw new Error(name + '.ts: ' + diagnostics.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')).join('\n'));
-    }
-
-    const mod = new Module(file, module);
-    mod.filename = file;
-    mod.paths = Module._nodeModulePaths(src);
-    cache.set(name, mod);
-
-    // Relative imports come back through `load`, so a decision module that
-    // quietly imported Monaco would fail here rather than pass by accident.
-    mod.require = function (request) {
-        if (request.startsWith('./')) {
-            return load(request.slice(2));
-        }
-        if (/monaco-editor/.test(request)) {
-            throw new Error(name + '.ts imports ' + request + ' — decisions must stay free of Monaco');
-        }
-        return Module.prototype.require.call(this, request);
-    };
-    mod._compile(outputText, file);
-
-    return mod.exports;
-}
+const load = createLoader({ root: path.join(root, 'CodeEditor'), forbid: [[/monaco-editor/, 'Monaco']] });
 
 /* ---------------------------------------------------------------- asserts */
 
