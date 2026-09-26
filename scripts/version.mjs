@@ -216,6 +216,7 @@ for (const location of locations) {
 }
 
 migrationPage();
+limitationsPage();
 
 console.log(
     dryRun
@@ -412,6 +413,30 @@ function migrationPage() {
         `\n  ${dryRun ? 'would write' : 'wrote'} docs/migration.md, pinned appliesTo ">=${next}".\n` +
         '  Fill it in or delete it — an unedited migration page is worse than none,\n' +
         '  and the hub publishes whatever is on the default branch.',
+    );
+}
+
+/**
+ * Name `docs/limitations.md` at the one moment it is most likely to be wrong.
+ *
+ * A release is usually picked off that page, and the hub publishes it from the
+ * default branch — so a gap the release closes stays on the component page,
+ * beside notes saying the opposite, until someone deletes the line.
+ * `pcf-data-table` 0.6.19 shipped grouping with its page still saying "No
+ * grouping and no aggregate row".
+ *
+ * A reminder rather than a check: which lines a release closes is a reading of
+ * the notes against the page, and nothing here can do that reading.
+ */
+function limitationsPage() {
+    if (!existsSync(join(root, 'docs', 'limitations.md'))) {
+        return;
+    }
+
+    console.log(
+        '\n  Reread docs/limitations.md for what this release closes: delete each gap it\n' +
+        '  no longer has, write the new feature\'s own limits, and commit it with the bump.\n' +
+        '  The hub publishes that page from the default branch.',
     );
 }
 

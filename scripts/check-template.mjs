@@ -254,7 +254,9 @@ if (Array.isArray(manifest.hosts)) {
 // Still a light structural read: the manifest is matched, not parsed.
 
 const TYPES = ['field', 'dataset', 'virtual', 'grid_customizer'];
-const FRAMEWORKS = ['standard', 'react', 'react_virtual'];
+// The hub's Framework enum. A control that bundles its own React is
+// `standard` — there is no third value, and the hub rejects one.
+const FRAMEWORKS = ['standard', 'react_virtual'];
 
 const type = manifest.control?.type;
 const framework = manifest.control?.framework;
@@ -698,6 +700,40 @@ if (datasetFixture && !exists(join(root, datasetFixture))) {
     problems.push(
         `pcfhub.json names demo.datasetFixture as "${datasetFixture}", which does not exist.`,
     );
+} else if (datasetFixture) {
+    /*
+     * What the file must hold depends on who reads it — the hub's
+     * DemoFixtureShape, mirrored: a dataset control or a grid host indexes
+     * `columns` and `records`; any other control reads only the `dataverse`
+     * section, a stand-in Dataverse for the calls its demo makes (pcfhub's
+     * docs/demo-harness-dataverse.md, "Field controls", 2026-09-24). The hub
+     * refuses the wrong shape at ingestion and says so only on the run.
+     */
+    const needsRows = manifest.control?.type === 'dataset' || (manifest.demo?.host ?? 'form') === 'grid';
+    let fixture = null;
+
+    try {
+        fixture = JSON.parse(readFileSync(join(root, datasetFixture), 'utf8'));
+    } catch (error) {
+        problems.push(`demo.datasetFixture "${datasetFixture}" is not valid JSON: ${error.message}`);
+    }
+
+    const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+    if (fixture !== null && !isObject(fixture)) {
+        problems.push(`demo.datasetFixture "${datasetFixture}" must be a JSON object.`);
+    } else if (fixture !== null && needsRows) {
+        for (const key of ['columns', 'records']) {
+            if (!Array.isArray(fixture[key])) {
+                problems.push(`demo.datasetFixture "${datasetFixture}" must have a ${key} array — the hub reads it as rows for this control.`);
+            }
+        }
+    } else if (fixture !== null && !isObject(fixture.dataverse)) {
+        problems.push(
+            `demo.datasetFixture "${datasetFixture}" must have a dataverse object — a control without a ` +
+            'dataset property reads nothing else from it.',
+        );
+    }
 }
 
 // ---------------------------------------------------------------- demo host
@@ -770,10 +806,11 @@ if (fidelity && fidelity !== 'none' && exists(join(root, 'out'))) {
  * The version, in every place the repository keeps one.
  *
  * `release-reusable.yml` already checks this — against every manifest in the
- * tree *and* against `Solution.xml` — but it does so on a Windows runner,
- * after the pack, on a tag that has already been pushed. So the failure mode
- * it produces is: delete the tag locally and remotely, fix, retag. That is the
- * same check, two seconds earlier, before any of that is possible.
+ * tree *and* against `Solution.xml` — and it runs first, before anything is
+ * installed or built, so it costs seconds rather than a pack. What it cannot
+ * avoid is that it runs on a tag that has already been pushed. So the failure
+ * mode it produces is: delete the tag locally and remotely, fix, retag. This
+ * is the same check, before the tag exists.
  *
  * A failure rather than a warning, because a disagreement has no benign
  * reading: one of the three files was edited and the others were not, and
