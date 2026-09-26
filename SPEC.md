@@ -493,12 +493,25 @@ The 1.4.0 zip over 1.3.11 on the Accounts form, the order schema from the
 | W8 | No schema (clear the property): no list anywhere, no hover beyond marker messages. XML: no list. |
 | W9 | P6 — a canvas app with an inline schema (studio and play): does the list open, is it at the caret, does Tab reach it? The phone client: can a suggestion be picked by touch? Neither cuts; the answer goes to the docs. |
 
+### Answers (cll365, Accounts form, 1.4.0, 2026-09-26)
+
+**All nine the right way; nothing cut.** W1 and W2 as written. W3: only the
+keys not yet in the object were offered. W4: the hover as described, whole.
+**W5: the list closed before it reached the header** — the rule designed
+from P1b holds on the form — followed the caret on a small scroll, and was
+gone after a tab switch. W6: the short field's list whole below it. **W7:
+both editors dark**, strips included. W8: no list without a schema, none in
+XML. **W9: completion works in a canvas app** (P6's first half); whether Tab
+reaches the editor there was not reported separately, and the phone client
+was not tried.
+
 ## Not verified
 
 From 1.4.0:
 
-- **Everything in the walkthrough above** until it is answered — the header
-  rule (W5) above all, which follows from P1b rather than being measured.
+- **The phone client** (P6's second half): whether the list opens and a
+  suggestion can be picked by touch.
+- **Tab in a canvas app** — on a model-driven form the form keeps it (P3).
 - **The follow on a slow machine.** The form fires about eight scroll events
   per wheel notch; each re-renders the editor while a widget is open. Fine
   on the test machine's form; unmeasured on a low-end client.
