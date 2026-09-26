@@ -12,7 +12,8 @@
 //     p.env()                    what the page is: CSP, Trusted Types, instances
 //     await p.suggest()          P1: open the list at the end of line 2, measure it
 //     await p.suggest(1, "last") P1: the same on the last line
-//     p.measure()                P1: measure a list or hover you opened by hand
+//     p.later(5)                 P1: measure in 5s — open a list or hover by hand meanwhile
+//     p.follow("hide")           P1b: in mode body, close on an outer scroll instead of following
 //     await p.hover()            P1, P2: open a hover, measure it, read what rendered
 //     p.overflow("fixed")        P1: then reload the form, and suggest/hover again
 //     p.overflow("body")         P1: the same with the widgets outside the control
@@ -134,6 +135,77 @@ function install(): void {
 type OverflowMode = "none" | "fixed" | "body";
 
 const bodyNodes = new Map<Editor, HTMLElement>();
+const cleanups = new Map<Editor, () => void>();
+
+// P1b. Mode "body" places the widgets right (the 1.3.10 answers) but Monaco
+// repositions them only on its own scroll, so a scroll of the form around
+// the editor leaves them behind, and a hidden editor (another form tab)
+// would leave them floating. What to do about it, chosen the same way:
+//
+//     localStorage.setItem("pcfCodeEditorProbe.follow", "hide")   // "follow" (default), "hide", "off"
+type FollowMode = "follow" | "hide" | "off";
+
+function followMode(): FollowMode {
+    try {
+        const v = window.localStorage.getItem("pcfCodeEditorProbe.follow");
+        return v === "hide" || v === "off" ? v : "follow";
+    } catch {
+        return "follow";
+    }
+}
+
+const followLog: unknown[] = [];
+
+function hideWidgets(editor: Editor): void {
+    editor.trigger("probe", "hideSuggestWidget", {});
+    editor.trigger("probe", "editor.action.hideHover", {});
+}
+
+/**
+ * For a widget under <body>: on any scroll outside the editor, re-render it
+ * ("follow" — Monaco reads the editor's page position again in
+ * prepareRender) or close the widgets ("hide"); and once the editor is out
+ * of view — scrolled off, or on a tab that is not showing — close them in
+ * either mode.
+ */
+function watchOuterScroll(editor: Editor, host: HTMLElement): () => void {
+    const mode = followMode();
+    if (mode === "off") {
+        return () => undefined;
+    }
+    const onScroll = (e: Event) => {
+        const target = e.target as Node | null;
+        if (target && target !== document && host.contains(target)) {
+            return; // the editor's own scroll; Monaco handles it
+        }
+        if (mode === "follow") {
+            editor.render(true);
+        } else {
+            hideWidgets(editor);
+        }
+        if (followLog.length < 50) {
+            followLog.push({ at: Math.round(performance.now()), mode, target: target instanceof Element ? describe(target) : "document" });
+        }
+    };
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+
+    const observer = typeof IntersectionObserver === "function"
+        ? new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting) {
+                    hideWidgets(editor);
+                    followLog.push({ at: Math.round(performance.now()), mode, hiddenBecause: "editor out of view" });
+                }
+            }
+        })
+        : null;
+    observer?.observe(host);
+
+    return () => {
+        document.removeEventListener("scroll", onScroll, { capture: true });
+        observer?.disconnect();
+    };
+}
 
 function overflowMode(): OverflowMode {
     try {
@@ -171,6 +243,7 @@ export function park(editor: Editor, host: HTMLElement, schemaInput: () => strin
     }
     if (bodyNode) {
         bodyNodes.set(editor, bodyNode);
+        cleanups.set(editor, watchOuterScroll(editor, host));
     }
     instances.set(model.uri.toString(), { index: instances.size + 1, editor, host, schemaInput });
 
@@ -199,6 +272,8 @@ export function unpark(editor: Editor): void {
     }
     bodyNodes.get(editor)?.remove();
     bodyNodes.delete(editor);
+    cleanups.get(editor)?.();
+    cleanups.delete(editor);
 }
 
 /* ------------------------------------------------------------ measure */
@@ -282,6 +357,32 @@ function seen(widget: Element): unknown {
     };
 }
 
+/**
+ * Where the widget sits against the caret. `seen` says whether anyone can see
+ * it; this says whether it is where they are looking — 1.3.10's "fixed" mode
+ * was seen whole and sat 296px below the caret, because the form's
+ * transformed ancestors capture position: fixed. A widget below the caret
+ * has `below` near 0, one above has `above` near 0.
+ */
+function fromCaret(instance: Instance, widget: Element): unknown {
+    const editor = instance.editor;
+    const position = editor.getPosition();
+    const visible = position ? editor.getScrolledVisiblePosition(position) : null;
+    const dom = editor.getDomNode();
+    if (!visible || !dom) {
+        return null;
+    }
+    const e = dom.getBoundingClientRect();
+    const w = widget.getBoundingClientRect();
+    const caretTop = e.top + visible.top;
+    return {
+        below: Math.round(w.top - (caretTop + visible.height)),
+        above: Math.round(caretTop - w.bottom),
+        left: Math.round(w.left - (e.left + visible.left)),
+        placed: Math.min(Math.abs(w.top - (caretTop + visible.height)), Math.abs(caretTop - w.bottom)) <= 4
+    };
+}
+
 function first(): Instance | undefined {
     return instances.values().next().value;
 }
@@ -321,18 +422,20 @@ function measureSuggest(instance: Instance): Record<string, unknown> {
         viewport: { width: window.innerWidth, height: window.innerHeight },
         clippedBy: widget ? clipping(widget) : [],
         seen: widget ? seen(widget) : null,
+        fromCaret: widget ? fromCaret(instance, widget) : null,
         labels
     };
 }
 
 /** The open hover, measured as it stands. */
-function measureHover(): Record<string, unknown> {
+function measureHover(instance?: Instance): Record<string, unknown> {
     const hover = document.querySelector(".monaco-hover:not(.hidden)") as HTMLElement | null;
     return {
         visible: !!hover,
         widget: rect(hover),
         clippedBy: hover ? clipping(hover) : [],
-        seen: hover ? seen(hover) : null
+        seen: hover ? seen(hover) : null,
+        fromCaret: hover && instance ? fromCaret(instance, hover) : null
     };
 }
 
@@ -372,7 +475,33 @@ const probe = {
     /** P1: measure the list and the hover you opened by hand — nothing is triggered. */
     measure(index?: number) {
         const instance = index ? Array.from(instances.values()).find((i) => i.index === index) : first();
-        return instance ? { suggest: measureSuggest(instance), hover: measureHover() } : "no instance";
+        return instance ? { suggest: measureSuggest(instance), hover: measureHover(instance) } : "no instance";
+    },
+
+    /**
+     * P1: measure after a delay, so the list can be opened by hand first —
+     * clicking into the console blurs the editor and closes the list, which
+     * is why 1.3.10's p.measure() found nothing open. Run this, click into
+     * the editor, open the list, and wait.
+     */
+    later(seconds = 5, index?: number) {
+        setTimeout(() => {
+            console.log("probe.later", JSON.stringify(probe.measure(index), null, 2));
+        }, seconds * 1000);
+        return `measuring in ${seconds}s — open the list or hover now`;
+    },
+
+    /** P1b: "follow", "hide" or "off" for mode body on the next load, and what it has done. */
+    follow(mode?: FollowMode) {
+        if (mode) {
+            try {
+                window.localStorage.setItem("pcfCodeEditorProbe.follow", mode);
+            } catch (error) {
+                return { stored: false, error: String(error) };
+            }
+            return { stored: mode, now: "reload the form" };
+        }
+        return { current: followMode(), overflow: overflowMode(), log: followLog.slice(-15) };
     },
 
     /** P1: the overflow mode for the next load — "none", "fixed" or "body". Reload after. */
@@ -419,6 +548,7 @@ const probe = {
             widget: rect(hover),
             clippedBy: hover ? clipping(hover) : [],
             seen: hover ? seen(hover) : null,
+            fromCaret: hover ? fromCaret(instance, hover) : null,
             violations: violations.slice()
         };
     },

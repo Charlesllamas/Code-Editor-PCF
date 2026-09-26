@@ -337,9 +337,45 @@ instance, not the schema).
 | P5 | With the two editors: `await p.each()` — each list's first item names its own instance. Then switch to another form tab and back: `p.env().instances` lists two, not four (`destroy` unregistered the first pair). | The registry keyed by model URI |
 | P6 | Not blocking: the canvas app's Code Editor (studio and play) and the phone client — does the list open, and can it be picked by touch? | Goes to *Not verified* or `docs/limitations.md`, never cuts |
 
-### Answers
+### Answers (cll365, Accounts form, 1.3.10, 2026-09-26)
 
-*Pending.*
+- **P1 — only mode `body` puts the widgets where they belong.**
+  - **`none`** (1.3's behaviour): on the last line of a 190px field the list
+    was **invisible** — `seen` all false, cut 99px by `.CodeEditor-editor`, 75
+    by `customControl`, 73 by the form cell `div#id-104_0`. On line 2 it fit.
+    The hover on line 2 lost its top 138px (`seen`: only the bottom corners).
+  - **`fixed`**: every widget was seen whole and **every one was in the
+    wrong place — 296px below and 44px right of where it belonged** (list on
+    line 10 at top 1101 against an editor ending at 805; line 2's at 949
+    against 653; the hover at 773 against 477), over the *next* section
+    down. It scrolled with the form, and a form-tab switch closed it. The
+    cause is in the `clippedBy` list: three form containers
+    (`div#id-122`, `mainContentContainer_0`, `editFormRoot0`) carry
+    `transform: matrix(1, 0, 0, 1, 0, 0)` — an identity transform, which
+    still makes each the containing block for `position: fixed`, while
+    Monaco computes the widget's coordinates against the viewport
+    (`_layoutBoxInPage`, `getDomNodePagePosition`). **`fixedOverflowWidgets`
+    cannot work on a model-driven form.** `seen` passed it: the probe
+    measured visibility, not placement — 1.3.11 adds `fromCaret`.
+  - **`body`** (`overflowWidgetsDomNode` under `<body>`): the list on the
+    last line hung from the editor's bottom edge at 805, whole; line 2's and
+    the hover sat where they belong, `clippedBy` empty. **But scrolling the
+    form left them behind** — Monaco repositions an overflow widget on its
+    own scroll only, and the form's scroll is a container's, not the editor's.
+  - `p.measure()` found nothing open in every mode: clicking into the console
+    blurs the editor and closes the list. 1.3.11's `p.later(5)` measures after
+    a delay instead.
+- **P1b** is the question that leaves: whether `body` can follow the form's
+  scroll, or should close on it. In the harness (2026-09-26), a scroll event
+  re-rendering the editor (`editor.render(true)`) brought a displaced list
+  back to the caret (`fromCaret.below` 30 → 0), and the `hide` strategy closed
+  the list and the hover. The pane dispatches no scroll events of its own
+  while hidden, so the event was dispatched by hand — a real scroll is the
+  form's to answer.
+
+| # | Ask | Cuts |
+|---|---|---|
+| P1b | 1.3.11, `p.overflow("body")`, reload. **Follow** (the default): open the list on line 2 and on the last line, scroll the form a little with the list open — does it stay on the caret? `p.follow()` shows the scroll events it saw; `p.later(5)` then scroll gives `fromCaret`. Scroll until the editor leaves the view — does the list close? Open the list, switch form tabs — gone, not floating over the other tab? Then `p.follow("hide")`, reload, and the same: does the list close on the first scroll? | Following vs closing on scroll; if neither is clean, completion ships with the list closing on any scroll |
 
 ## Not verified
 
