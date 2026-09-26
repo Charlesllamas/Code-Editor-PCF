@@ -396,6 +396,23 @@ closes on the caret's line, not on the editor.**
   a pure module. W-list item, since it follows from this answer rather than
   asking a new question.
 
+- **P2 — markdown hovers render under the form's policy, and in `body`
+  they sit on the caret.** From 1.3.10: `hasEm`, `hasCode`, `hasList` true,
+  a fenced block rendered, `violations` empty; a `supportHtml: false` string
+  arrives with its tags stripped rather than shown (`rawHtmlAsText` false) —
+  safe, and all 1.4.0 needs, since schema text is escaped before it is
+  Markdown. From 1.3.11 in `body`: `seen` all five points, `fromCaret`
+  `above: 1`, `left: -7`, `placed` true, `violations` empty. Whether the form
+  enforces Trusted Types was not read; the hover rendering with no violation
+  is the answer that mattered.
+- **P4 — nothing asks for a worker.** `p.console()` after P1–P3 in
+  `body`/`follow`: `getWorker: 0`, `workerWarning: 0` — not even 1.3's one
+  fallback warning, so with `wordBasedSuggestions: "off"` the suggest
+  contribution never reaches the editor worker service at all. `error: 1`
+  and `warn: 20` were the platform's; none named `bundle.js`. The Network
+  tab was not read and did not need to be: 1.3's failing `?esm` fetch sits
+  behind `getWorker`, which was never called.
+
 | # | Ask | Cuts |
 |---|---|---|
 | P1b | 1.3.11, `p.overflow("body")`, reload. **Follow** (the default): open the list on line 2 and on the last line, scroll the form a little with the list open — does it stay on the caret? `p.follow()` shows the scroll events it saw; `p.later(5)` then scroll gives `fromCaret`. Scroll until the editor leaves the view — does the list close? Open the list, switch form tabs — gone, not floating over the other tab? Then `p.follow("hide")`, reload, and the same: does the list close on the first scroll? | Following vs closing on scroll; if neither is clean, completion ships with the list closing on any scroll |
