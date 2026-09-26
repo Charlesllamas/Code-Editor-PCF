@@ -7,6 +7,9 @@ import "./monacoFeatures";
 import { format as formatJson, applyEdits } from "jsonc-parser";
 import { resolveLanguage as resolve } from "./languages";
 import { formatXml } from "./formatXml";
+import { complete } from "./complete";
+import { hover } from "./hover";
+import { schemaRegistry } from "./schemaRegistry";
 
 // Registering a language gives monaco its id, extensions and aliases, and wires
 // a lazy tokens-provider factory. Under PCF's single-chunk build that factory
@@ -150,6 +153,69 @@ monaco.languages.registerDocumentFormattingEditProvider("xml", {
             return [];
         }
         return [{ range: model.getFullModelRange(), text: formatted }];
+    }
+});
+
+// Completion and hover for JSON, from the schema in force. Registered once for
+// the page, like everything above: a provider belongs to a language, not to
+// an editor, so each looks up the schema its model's control filed in
+// schemaRegistry.ts and answers nothing without one — a JSON editor with no
+// schema behaves exactly as 1.3 did. The contributions that draw the list and
+// place a snippet's caret are imported in monacoFeatures.ts, ahead of the
+// first API call above, or they are inert.
+//
+// `"` opens the list on a key, `:` on a value; typing a word opens it too
+// (quickSuggestions, set per editor in index.ts). Enter takes a suggestion —
+// on a model-driven form Tab never reaches the editor (SPEC.md P3).
+function rangeOf(model: monaco.editor.ITextModel, start: number, end: number): monaco.Range {
+    const a = model.getPositionAt(start);
+    const b = model.getPositionAt(end);
+    return new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column);
+}
+
+function markdown(value: string): monaco.IMarkdownString {
+    // Untrusted and without HTML: the text is the schema author's, and a
+    // hover renders it (SPEC.md P2 — tags are stripped, not rendered).
+    return { value, isTrusted: false, supportHtml: false };
+}
+
+monaco.languages.registerCompletionItemProvider("json", {
+    triggerCharacters: ["\"", ":"],
+    provideCompletionItems(model, position) {
+        const entry = schemaRegistry.get(model.uri.toString());
+        if (!entry) {
+            return { suggestions: [] };
+        }
+        const found = complete(model.getValue(), model.getOffsetAt(position), entry.schema, entry.labels);
+        return {
+            suggestions: found.map((s) => ({
+                label: s.label,
+                kind: s.kind === "property"
+                    ? monaco.languages.CompletionItemKind.Property
+                    : monaco.languages.CompletionItemKind.Value,
+                insertText: s.insertText,
+                insertTextRules: s.snippet ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
+                filterText: s.filterText,
+                detail: s.detail,
+                documentation: s.documentation ? markdown(s.documentation) : undefined,
+                sortText: s.sortText,
+                tags: s.deprecated ? [monaco.languages.CompletionItemTag.Deprecated] : undefined,
+                range: rangeOf(model, s.start, s.end)
+            }))
+        };
+    }
+});
+
+monaco.languages.registerHoverProvider("json", {
+    provideHover(model, position) {
+        const entry = schemaRegistry.get(model.uri.toString());
+        if (!entry) {
+            return null;
+        }
+        const answer = hover(model.getValue(), model.getOffsetAt(position), entry.schema, entry.labels);
+        return answer
+            ? { range: rangeOf(model, answer.offset, answer.offset + answer.length), contents: [markdown(answer.markdown)] }
+            : null;
     }
 });
 

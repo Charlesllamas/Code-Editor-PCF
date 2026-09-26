@@ -85,6 +85,13 @@ property "sku"*, *Property "note" is not allowed*. The strip names the schema
 in force; if it cannot be had — a misspelt name, a resource nobody published —
 the strip says so, and syntax checking carries on.
 
+From 1.4.0 the same schema **suggests as you type**: the property names it
+declares where a key goes, required ones first, and its allowed values where
+a value goes. Enter takes a suggestion — on a form, Tab moves to the next
+field instead. Rest the pointer on a property to read its description. Write
+a `description` (or VS Code's `markdownDescription`) and a `default` into the
+schema, and both appear there.
+
 The property panel accepts no more than 100 characters, so a schema cannot be
 pasted into it on a form: use a web resource. After editing the schema,
 **publish** again; an unpublished edit reaches nobody.

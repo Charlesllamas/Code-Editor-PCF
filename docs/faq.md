@@ -82,6 +82,20 @@ Yes, from 1.3.0. Put the schema in a **Script (JScript)** web resource,
 publish it, and set **JSON schema** to its name. In a canvas app, pass the
 schema itself as text. See [Model-driven apps](model-driven).
 
+## Can it suggest property names as I type?
+
+Yes, from 1.4.0, when a schema is in force — the same schema that checks the
+document. Type `"` where a key goes, or `:` after one, and the list opens with
+what the schema declares there; `Ctrl+Space` opens it anywhere. **Enter**
+takes a suggestion, and **Escape** closes the list. Rest the pointer on a
+property to read its description. Without a schema, nothing is suggested.
+
+## Tab does not take the suggestion, or indent.
+
+On a model-driven form, Tab belongs to the form: it moves to the next field
+before the editor sees the key. Use **Enter** to take a suggestion, and
+**Format** in the strip (or `Shift+Alt+F`) to indent the whole document.
+
 ## The strip says my schema was not found.
 
 Check the name — it is the web resource's full name, prefix and folders
@@ -110,7 +124,8 @@ one.
 model-driven app with the modern look publishes whether it is dark, and the
 editor follows it; a canvas app publishes nothing, so `auto` is light there
 and `dark` is how to get the dark editor. The theme is global to the page, so
-two editors on one form share it.
+two editors on one form share it: from 1.4.0 a forced `light` or `dark` wins
+over `auto`, and each editor's strip matches the theme shown.
 
 ## How do I format a document?
 

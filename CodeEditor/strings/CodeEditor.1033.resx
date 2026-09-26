@@ -242,4 +242,19 @@
   <data name="Status_SchemaUnsupported" xml:space="preserve">
     <value>The schema must be a web resource name or a JSON document</value>
   </data>
+  <data name="Completion_Required" xml:space="preserve">
+    <value>required</value>
+  </data>
+  <data name="Completion_Deprecated" xml:space="preserve">
+    <value>deprecated</value>
+  </data>
+  <data name="Completion_Default" xml:space="preserve">
+    <value>default</value>
+  </data>
+  <data name="Hover_AllowedValues" xml:space="preserve">
+    <value>Allowed values</value>
+  </data>
+  <data name="Hover_Default" xml:space="preserve">
+    <value>Default</value>
+  </data>
 </root>

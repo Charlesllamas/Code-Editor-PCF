@@ -42,13 +42,26 @@
      * rule the strip has to word — a type, a minimum, a missing property, an
      * enum, and a property the schema does not allow.
      */
+    // The titles, descriptions and default are 1.4.0's: completion and hover
+    // read them. None of them changes what validates.
     var ORDER_SCHEMA = JSON.stringify({
         type: 'object',
         required: ['id', 'lines'],
         properties: {
-            id: { type: 'number' },
-            lines: { type: 'array', items: { type: 'object', required: ['sku'], properties: { sku: { type: 'string' }, qty: { type: 'integer', minimum: 1 } } } },
-            status: { enum: ['open', 'closed'] },
+            id: { type: 'number', title: 'Order number', description: 'The number the order was issued under.' },
+            lines: {
+                type: 'array',
+                description: 'One entry per product ordered.',
+                items: {
+                    type: 'object',
+                    required: ['sku'],
+                    properties: {
+                        sku: { type: 'string', markdownDescription: 'The **stock keeping unit**, as printed on the label.' },
+                        qty: { type: 'integer', minimum: 1, default: 1, description: 'How many; at least one.' },
+                    },
+                },
+            },
+            status: { enum: ['open', 'closed'], default: 'open', description: 'Where the order is in its life.' },
         },
         additionalProperties: false,
     }, null, 2);

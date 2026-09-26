@@ -8,10 +8,12 @@
 // imports eighty grammars and the four worker-backed language services this
 // control cannot run. So the list is written out here instead.
 //
-// The rule for adding one: it has to work without a language service. A
-// contribution that only lights up given a provider -- suggest, rename,
-// go-to-definition, code lens, inlay hints -- is bundle weight with no
-// visible effect here. Measure `out/controls/CodeEditor/bundle.js` after a
+// The rule for adding one: it has to have something to work on without a
+// language service. A contribution that only lights up given a provider --
+// rename, go-to-definition, code lens, inlay hints -- is bundle weight with no
+// visible effect here, unless this control registers the provider itself on
+// the main thread, as monacoSetup.ts does for JSON completion and hover (1.4.0).
+// Measure `out/controls/CodeEditor/bundle.js` after a
 // production build; the ceiling is Dataverse's 5 MB web resource limit and
 // docs/limitations.md quotes the current figure.
 
@@ -57,8 +59,10 @@ import "monaco-editor/editor/contrib/suggest/browser/suggestController";
 import "monaco-editor/editor/contrib/snippet/browser/snippetController2";
 
 // Accessibility and the platform's clients: Ctrl+M releases Tab for the
-// form's own focus order, F1 lists every command, Ctrl+G goes to a line, and
-// the iPad keyboard button matters on the tablet client.
+// host's own focus order where the host lets Tab reach the editor at all (a
+// model-driven form does not: it moves focus before the editor sees the key,
+// SPEC.md P3), F1 lists every command, Ctrl+G goes to a line, and the iPad
+// keyboard button matters on the tablet client.
 import "monaco-editor/editor/contrib/toggleTabFocusMode/browser/toggleTabFocusMode";
 import "monaco-editor/editor/standalone/browser/quickAccess/standaloneCommandsQuickAccess";
 import "monaco-editor/editor/standalone/browser/quickAccess/standaloneGotoLineQuickAccess";

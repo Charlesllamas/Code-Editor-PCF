@@ -33,16 +33,43 @@
         (function () {
             'use strict';
 
+            // The harness's schema, descriptions and all (1.4.0 reads them).
             var ORDER_SCHEMA = JSON.stringify({
                 type: 'object',
                 required: ['id', 'lines'],
                 properties: {
-                    id: { type: 'number' },
-                    lines: { type: 'array', items: { type: 'object', required: ['sku'], properties: { sku: { type: 'string' }, qty: { type: 'integer', minimum: 1 } } } },
-                    status: { enum: ['open', 'closed'] }
+                    id: { type: 'number', title: 'Order number', description: 'The number the order was issued under.' },
+                    lines: {
+                        type: 'array',
+                        description: 'One entry per product ordered.',
+                        items: { type: 'object', required: ['sku'], properties: { sku: { type: 'string', markdownDescription: 'The **stock keeping unit**, as printed on the label.' }, qty: { type: 'integer', minimum: 1, default: 1, description: 'How many; at least one.' } } }
+                    },
+                    status: { enum: ['open', 'closed'], default: 'open', description: 'Where the order is in its life.' }
                 },
                 additionalProperties: false
             });
+
+            /*
+             * The widgets need an editor that exists and has focus, so the two
+             * 1.4.0 states act after mounting. `_editor` is private to the
+             * TypeScript and plain to the page.
+             */
+            function openList(line, column) {
+                return function (control) {
+                    var editor = control._editor;
+                    editor.focus();
+                    editor.setPosition({ lineNumber: line, column: column });
+                    editor.trigger('shots', 'editor.action.triggerSuggest', {});
+                };
+            }
+            function openHover(line, column) {
+                return function (control) {
+                    var editor = control._editor;
+                    editor.focus();
+                    editor.setPosition({ lineNumber: line, column: column });
+                    editor.trigger('shots', 'editor.action.showHover', {});
+                };
+            }
 
             var ORDER = '{\n  "id": "A-1",\n  "lines": [\n    { "sku": "x", "qty": 0 },\n    { "qty": 2 }\n  ],\n  "status": "void",\n  "note": 1\n}';
 
@@ -57,7 +84,9 @@
                 faults: { code: FAULTS, language: 'json', theme: 'auto', height: 220, fit: false, dark: false },
                 dark: { code: CONFIG, language: 'json', theme: 'dark', height: 400, fit: true, dark: true },
                 xml: { code: XML, language: 'xml', theme: 'auto', height: 400, fit: true, dark: false },
-                schema: { code: ORDER, language: 'json', theme: 'auto', height: 250, fit: false, dark: false, schema: 'new_/schemas/order.json' }
+                schema: { code: ORDER, language: 'json', theme: 'auto', height: 250, fit: false, dark: false, schema: 'new_/schemas/order.json' },
+                completion: { code: '{\n  \n}', language: 'json', theme: 'auto', height: 120, fit: false, dark: false, schema: ORDER_SCHEMA, after: openList(2, 3) },
+                hover: { code: '\n\n\n{\n  "id": 7,\n  "status": "open",\n  "lines": []\n}', language: 'json', theme: 'auto', height: 200, fit: false, dark: false, schema: ORDER_SCHEMA, after: openHover(6, 5) }
             };
 
             var state = STATES[new URLSearchParams(location.search).get('state') || 'faults'];
@@ -103,6 +132,9 @@
                 var control = new registered();
                 control.init(context, function () {}, {}, document.getElementById('root'));
                 control.updateView(context);
+                if (state.after) {
+                    setTimeout(function () { state.after(control); }, 200);
+                }
             };
         })();
     </script>

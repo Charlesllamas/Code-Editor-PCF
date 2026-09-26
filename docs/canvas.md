@@ -77,6 +77,11 @@ If(CodeEditor1.isValid, "Ready to save", CodeEditor1.problemCount & " problem(s)
 was asked for is not in force — a broken schema, say — because the document
 has not been checked against it. With **Validation** off it is always true.
 
+From 1.4.0 the same schema also suggests property names and allowed values as
+you type, and describes a property under the pointer. Enter takes a
+suggestion. Whether Tab reaches the editor in a canvas app — it does not on a
+model-driven form — is not yet measured.
+
 ## Other rough edges
 
 - The editor fills the box you give it. A short box gets a short editor with its

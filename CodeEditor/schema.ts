@@ -67,7 +67,9 @@ export function resolveSchemaSource(raw: string | null | undefined): SchemaSourc
 export type SchemaFault = "notJson" | "invalidSchema";
 
 export type CompiledSchema =
-    | { ok: true; validate: (text: string) => Problem[] }
+    // `schema` is the parsed document, for completion and hover to walk;
+    // `validate` is the prepared validator.
+    | { ok: true; validate: (text: string) => Problem[]; schema: unknown }
     | { ok: false; fault: SchemaFault; message: string };
 
 /**
@@ -95,7 +97,7 @@ export function compileSchema(text: string): CompiledSchema {
         return { ok: false, fault: "invalidSchema", message: schemaErrorText(error) };
     }
 
-    return { ok: true, validate: (doc) => validateWith(validator, doc) };
+    return { ok: true, validate: (doc) => validateWith(validator, doc), schema };
 }
 
 /** The draft a schema declares, defaulting to the newest. */

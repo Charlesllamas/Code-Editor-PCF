@@ -39,7 +39,31 @@ XML document goes through the browser's own parser, which reports the first
 fault only, because that is what `DOMParser` reports. The other twelve
 languages are coloured and not checked.
 
-It is not IntelliSense: there is no completion in any language.
+## Completion comes from the schema, and only from the schema
+
+From 1.4.0 a JSON document with a schema in force offers the schema's
+property names where a key goes and its allowed values where a value goes,
+and shows a property's description when the pointer rests on it. What that
+does not cover:
+
+- **No schema, no completion.** A JSON editor without one — and every other
+  language — behaves as 1.3 did: coloured, validated where it is JSON or XML,
+  and nothing suggested. There is no word-based completion either.
+- **The schema has to be in force.** Completion follows validation: JSON,
+  validation on, and the schema loaded. While it is loading, missing or
+  broken, nothing is offered.
+- **Names come from `properties`.** A property matched only by a
+  `patternProperties` pattern, or allowed by `additionalProperties`, has no
+  name to offer; once typed, its schema is used for values and hover.
+- **Every shape a schema allows is offered.** Where `anyOf`, `oneOf` or
+  `if`/`then`/`else` leave the choice open, suggestions come from every
+  branch. Validation is what decides which one the document matched.
+- **Values come from `enum`, `const`, `default` and `examples`**, and failing
+  those from the type — `true`/`false`, `{}`, `[]`. A string with no list of
+  values offers empty quotes, nothing more.
+- **Descriptions are shown as written.** `description` is plain text;
+  VS Code's `markdownDescription` is rendered as Markdown. HTML in either is
+  not rendered.
 
 ## Schema validation has edges
 
@@ -103,10 +127,14 @@ Set the rows generously, or leave `height` as the ceiling.
 
 ## The theme is global
 
-Monaco has one theme per page. `theme` set to `auto` follows the app, which is
-what every editor on a form wants; a maker who forces `light` on one editor and
-`dark` on another gets whichever rendered last. In a canvas app, and on the
-classic model-driven look, the app publishes no theme and `auto` means light.
+Monaco has one theme per page, so every Code Editor on a form shows the same
+one. `theme` set to `auto` follows the app, which is what every editor on a
+form wants. From 1.4.0 a forced theme outranks `auto`: one editor set to
+`dark` beside another left on `auto` makes both dark. A maker who forces
+`light` on one editor and `dark` on another gets whichever arrived last. The
+strip under each editor always matches the theme the page shows. In a canvas
+app, and on the classic model-driven look, the app publishes no theme and
+`auto` means light.
 
 ## External changes are ignored while you are typing
 
@@ -141,7 +169,7 @@ them as read-only labels and offers no binding.
 
 ## The bundle and the platform's size limit
 
-`bundle.js` is about 4.1 MB. Dataverse rejects a web resource larger than 5 MB
+`bundle.js` is about 4.3 MB. Dataverse rejects a web resource larger than 5 MB
 by default, so the control imports into a default environment with room to
 spare — earlier releases sat at 4.9 MB, because they carried Monaco's JSON
 language service as well, all of it dead weight behind workers that could never
@@ -160,5 +188,11 @@ the hundreds of kilobytes are usable but noticeably slower to save.
 ## Keyboard shortcuts are captured while focused
 
 Monaco binds a lot of keys. While the cursor is inside the editor, app- or
-browser-level shortcuts sharing those bindings will not fire. `Ctrl+M` releases
-`Tab` so keyboard users can move on to the next field.
+browser-level shortcuts sharing those bindings will not fire.
+
+**Tab is the form's.** On a model-driven form, Tab moves to the next field
+before the editor sees it — so it never indents, and it does not take a
+suggestion. Use **Enter** to take one (with the list closed, Enter starts a
+new line as usual), and Format for indentation. `Ctrl+M`, Monaco's switch for
+what Tab does, has nothing to switch there. In a canvas app, whether Tab
+reaches the editor is not yet measured.

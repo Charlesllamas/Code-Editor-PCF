@@ -30,6 +30,10 @@ const SHOTS = {
     dark: { file: 'screenshot-dark.png', height: 200 },
     xml: { file: 'screenshot-xml.png', height: 143 },
     schema: { file: 'screenshot-schema.png', height: 274 },
+    // 1.4.0: the list hangs below the editor and the hover above a line —
+    // both in the node under <body>, so the crop leaves them room.
+    completion: { file: 'screenshot-completion.png', height: 280 }, // Monaco fits the list to the window: less, and it flips above the caret
+    hover: { file: 'screenshot-hover.png', height: 225 },
 };
 
 const BROWSERS = [

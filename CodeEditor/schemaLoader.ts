@@ -22,7 +22,7 @@ import { compileSchema } from "./schema";
 import { Problem } from "./validate";
 
 export type SchemaLoad =
-    | { state: "ready"; validate: (text: string) => Problem[] }
+    | { state: "ready"; validate: (text: string) => Problem[]; schema: unknown }
     | { state: "notFound" }
     | { state: "denied"; status: number }
     | { state: "failed"; status: number }
@@ -80,7 +80,7 @@ export async function loadWebResourceSchema(name: string, clientUrl: string | nu
 export function fromText(text: string): SchemaLoad {
     const compiled = compileSchema(text);
     if (compiled.ok) {
-        return { state: "ready", validate: compiled.validate };
+        return { state: "ready", validate: compiled.validate, schema: compiled.schema };
     }
     return compiled.fault === "notJson" ? { state: "notJson" } : { state: "invalidSchema", message: compiled.message };
 }

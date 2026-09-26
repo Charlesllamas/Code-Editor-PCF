@@ -242,4 +242,19 @@
   <data name="Status_SchemaUnsupported" xml:space="preserve">
     <value>El esquema debe ser el nombre de un recurso web o un documento JSON</value>
   </data>
+  <data name="Completion_Required" xml:space="preserve">
+    <value>obligatorio</value>
+  </data>
+  <data name="Completion_Deprecated" xml:space="preserve">
+    <value>en desuso</value>
+  </data>
+  <data name="Completion_Default" xml:space="preserve">
+    <value>predeterminado</value>
+  </data>
+  <data name="Hover_AllowedValues" xml:space="preserve">
+    <value>Valores permitidos</value>
+  </data>
+  <data name="Hover_Default" xml:space="preserve">
+    <value>Predeterminado</value>
+  </data>
 </root>

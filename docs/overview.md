@@ -28,6 +28,11 @@ numbers, and finding out it was wrong when the integration fails.
   your environment (or passed inline in a canvas app), its faults marked and
   worded like syntax faults: *Missing required property "sku"*, *Must be one
   of "open", "closed"*.
+- **Completion and hover from the schema** — with a schema in force, the
+  property names it declares where a key goes (required ones first) and its
+  allowed values where a value goes, each with its description; rest the
+  pointer on a property to read what the schema says about it. Enter takes a
+  suggestion.
 - **Format** for JSON and XML, from the strip, the context menu or
   `Shift+Alt+F`.
 - **`isValid` and `problemCount`** for a canvas app to act on — a Save
@@ -39,16 +44,21 @@ numbers, and finding out it was wrong when the integration fails.
   document, with `fitContent`, up to a height you choose.
 - Nothing outside your environment. Monaco is compiled into the solution, and a schema is read from your own web resources.
 
+::image{src=media/screenshot-completion.png alt="An empty JSON object with the completion list open under the caret: id, marked number and required, then lines and status" zoom}
+
+::image{src=media/screenshot-hover.png alt="The pointer on the status property: its description, its two allowed values and its default, in a box above the line" zoom}
+
 ::image{src=media/screenshot-dark.png alt="The same editor in the dark theme, sized to its eight-line document" zoom}
 
 ## What you do not get
 
 :::callout{type=warning}
-**No IntelliSense or completion, in any language, and no validation beyond
-JSON and XML.** Monaco's language services run in web workers, and Power Apps
-serves a code component as a single JavaScript file with no way to serve
-worker files alongside it. The JSON and XML checks run on the main thread
-instead; the other twelve languages are coloured, not flagged.
+**No IntelliSense beyond the schema, and no validation beyond JSON and
+XML.** Monaco's language services run in web workers, and Power Apps serves a
+code component as a single JavaScript file with no way to serve worker files
+alongside it. The JSON and XML checks, and completion from a JSON Schema, run
+on the main thread instead; without a schema nothing is suggested, and the
+other twelve languages are coloured, not flagged.
 
 **Fourteen languages, not eighty.** Monaco has grammars for around eighty; this
 control bundles a curated fourteen. Anything else renders as plain text. Adding
@@ -56,8 +66,8 @@ more is cheap — see [Limitations](limitations).
 :::
 
 If you are upgrading from a release that loaded Monaco from a CDN, both of those
-are a step back from what you had — that build had working IntelliSense and every
-grammar Monaco ships. What you get in exchange is a control that
+are a step back from what you had — that build had IntelliSense in every
+language and every grammar Monaco ships. What you get in exchange is a control that
 works on a locked-down network, in a sovereign cloud, or anywhere else outbound
 access to `cdn.jsdelivr.net` is not a given — which is where the old build
 silently rendered an empty box.

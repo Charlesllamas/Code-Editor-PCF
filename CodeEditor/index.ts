@@ -3,17 +3,35 @@ import monaco, { resolveLanguage } from "./monacoSetup";
 import { displayName } from "./languages";
 import { hasValidator, Problem, validateJson, validateXml } from "./validate";
 import { resolveHeight, resolveWidth, STATUS_BAR_HEIGHT } from "./sizing";
-import { MonacoTheme, resolveTheme } from "./theme";
+import { MonacoTheme, pageTheme, ThemeVote } from "./theme";
 import { resolveSchemaSource } from "./schema";
 import { fromText, loadWebResourceSchema, SchemaStatus, schemaStatusText, schemaWithholdsVerdict } from "./schemaLoader";
-// THROWAWAY: the 1.3.9 probe (SPEC.md P1–P6). Remove with probe.ts before 1.4.0.
-import * as probe from "./probe";
+import { schemaRegistry } from "./schemaRegistry";
+import { lineVisible, visibleArea } from "./clip";
+import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from "./overflow";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
 
 /** Typing pauses this long before the document is re-validated. */
 const VALIDATE_DELAY_MS = 300;
+
+/*
+ * The page's one Monaco theme (theme.ts): every live control's vote, in the
+ * order it arrived, and how to show that control the theme in force — so the
+ * strip under each editor matches the editor, whichever control decided it.
+ */
+const themeVotes = new Map<object, { vote: ThemeVote; show: (theme: MonacoTheme) => void }>();
+let themeInForce: MonacoTheme | undefined;
+
+function repaintPageTheme(): void {
+    const theme = pageTheme(Array.from(themeVotes.values(), (v) => v.vote));
+    if (theme !== themeInForce) {
+        themeInForce = theme;
+        monaco.editor.setTheme(theme);
+    }
+    themeVotes.forEach((v) => v.show(theme));
+}
 
 export class CodeEditor implements ComponentFramework.StandardControl<IInputs, IOutputs> {
 
@@ -37,8 +55,12 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      */
     private _code: string | null = null;
     private _language: string;
-    private _theme: MonacoTheme | undefined;
     private _validate = true;
+    /** Where the completion list and the hover render: a node under <body> (overflow.ts). */
+    private _overflowNode: HTMLElement | undefined;
+    private _stopWatchingScroll: (() => void) | undefined;
+    /** The model URI this control filed a schema under, if it did. */
+    private _registeredUri: string | undefined;
     private _fitContent = false;
     private _readOnly = false;
     private _suppressChange = false;
@@ -86,18 +108,31 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._code = context.parameters.code.raw ?? null;
         this._language = resolveLanguage(context.parameters.language.raw);
 
-        // THROWAWAY (probe): the overflow mode P1 compares.
-        const { __body: probeBody, ...probeOptions } = probe.createOptions();
+        // The list and every hover render under <body>, where no form
+        // container can cut them or move their origin (overflow.ts).
+        this._overflowNode = createOverflowNode(this._container.ownerDocument);
+
         this._editor = monaco.editor.create(this._editorHost, {
-            ...probeOptions,
             value: this._code ?? "",
             language: this._language,
             readOnly: this._readOnly,
             // The wrapper div owns the size; Monaco is told explicitly via layout().
             automaticLayout: false,
             scrollBeyondLastLine: false,
-            minimap: { enabled: false }
+            minimap: { enabled: false },
+            // Read at creation only (SPEC.md P1): updateOptions ignores both.
+            overflowWidgetsDomNode: this._overflowNode,
+            fixedOverflowWidgets: true,
+            // Completion from the schema, and nothing else: word-based
+            // suggestions would offer every language its own words and ask
+            // for the editor worker (SPEC.md P4).
+            wordBasedSuggestions: "off",
+            quickSuggestions: { strings: true, other: true, comments: false },
+            acceptSuggestionOnEnter: "smart",
+            suggest: { showWords: false }
         });
+
+        this._stopWatchingScroll = watchOuterScroll(this._editorHost, () => this.followOuterScroll(), () => this.closeWidgets());
 
         this._editor.onDidChangeModelContent(() => {
             if (this._suppressChange) {
@@ -120,7 +155,6 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this.layout(context);
         this.readSchema(context);
         this.runValidate();
-        probe.park(this._editor, this._editorHost, () => this._schemaRaw ?? null, probeBody);
     }
 
     /**
@@ -195,14 +229,22 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             window.clearTimeout(this._validateTimer);
             this._validateTimer = undefined;
         }
-        if (this._editor) {
-            probe.unpark(this._editor);
-        }
+        this._stopWatchingScroll?.();
+        this._stopWatchingScroll = undefined;
+        this.unregisterSchema();
         const model = this._editor?.getModel();
         if (model) {
             monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
         }
         this._editor?.dispose();
+        // The node lives under <body>, outside the container the platform
+        // removes, so it goes explicitly or every remount leaves one behind.
+        this._overflowNode?.remove();
+        this._overflowNode = undefined;
+        // The page's theme is decided again without this control's vote.
+        if (themeVotes.delete(this)) {
+            repaintPageTheme();
+        }
     }
 
     /* ------------------------------------------------------------ inputs */
@@ -220,15 +262,100 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         return context.mode.isControlDisabled || (secured ? !secured.editable : false);
     }
 
+    /**
+     * Cast this control's vote for the page's theme (theme.ts), and repaint
+     * when it changed. A changed vote moves to the back of the queue: it is
+     * the latest word, which is what "the last to arrive wins" means.
+     */
     private applyTheme(context: ComponentFramework.Context<IInputs>): void {
-        const theme = resolveTheme(context.parameters.theme?.raw, context.fluentDesignLanguage?.isDarkTheme);
-        if (theme === this._theme) {
+        const vote: ThemeVote = { preference: context.parameters.theme?.raw, isDarkTheme: context.fluentDesignLanguage?.isDarkTheme };
+        const before = themeVotes.get(this)?.vote;
+        if (before && before.preference === vote.preference && before.isDarkTheme === vote.isDarkTheme) {
             return;
         }
-        this._theme = theme;
-        // Global to the page -- see theme.ts.
-        monaco.editor.setTheme(theme);
-        this._root.dataset.theme = theme;
+        themeVotes.delete(this);
+        themeVotes.set(this, {
+            vote,
+            show: (theme) => {
+                this._root.dataset.theme = theme;
+            }
+        });
+        repaintPageTheme();
+    }
+
+    /* ------------------------------------------------- list and hover */
+
+    /** Close the completion list and the hover, if either is open. */
+    private closeWidgets(): void {
+        this._editor?.trigger(MARKER_OWNER, "hideSuggestWidget", {});
+        this._editor?.trigger(MARKER_OWNER, "editor.action.hideHover", {});
+    }
+
+    /**
+     * A scroll outside the editor: move an open list or hover with the
+     * caret, or close it once the caret's line has left what the user can
+     * see (clip.ts). Nothing open, nothing to do — the form fires several of
+     * these per wheel notch (SPEC.md P1b).
+     */
+    private followOuterScroll(): void {
+        const node = this._overflowNode;
+        if (!node || !this._editor || !node.querySelector(".suggest-widget.visible, .monaco-hover:not(.hidden)")) {
+            return;
+        }
+        const position = this._editor.getPosition();
+        const caret = position ? this._editor.getScrolledVisiblePosition(position) : null;
+        const dom = this._editor.getDomNode();
+        if (!caret || !dom) {
+            this.closeWidgets();
+            return;
+        }
+        const top = dom.getBoundingClientRect().top + caret.top;
+        const area = visibleArea(viewportRect(window), clipRects(this._editorHost));
+        if (lineVisible(area, { top, bottom: top + caret.height })) {
+            // Monaco reads the editor's page position again as it lays out.
+            this._editor.render(true);
+        } else {
+            this.closeWidgets();
+        }
+    }
+
+    /**
+     * File the schema in force for completion and hover (schemaRegistry.ts),
+     * or take it back. In force means what validation means by it: JSON,
+     * validation on, and the schema loaded — so the list never offers what
+     * the check would not hold the document to.
+     */
+    private registerSchema(): void {
+        const model = this._editor?.getModel();
+        const load = this._schema.kind === "loaded" ? this._schema.load : undefined;
+        const ready = load?.state === "ready" ? load : undefined;
+        if (!model || !ready || !this._validate || this._language !== "json") {
+            this.unregisterSchema();
+            return;
+        }
+        const uri = model.uri.toString();
+        if (uri === this._registeredUri && schemaRegistry.get(uri)?.schema === ready.schema) {
+            return; // a keystroke: nothing about the schema changed
+        }
+        this.unregisterSchema();
+        schemaRegistry.set(uri, {
+            schema: ready.schema,
+            labels: {
+                required: this.text("Completion_Required"),
+                deprecated: this.text("Completion_Deprecated"),
+                defaultValue: this.text("Completion_Default"),
+                allowedValues: this.text("Hover_AllowedValues"),
+                defaultHeading: this.text("Hover_Default")
+            }
+        });
+        this._registeredUri = uri;
+    }
+
+    private unregisterSchema(): void {
+        if (this._registeredUri !== undefined) {
+            schemaRegistry.delete(this._registeredUri);
+            this._registeredUri = undefined;
+        }
     }
 
     /**
@@ -326,6 +453,9 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             endColumn: p.column + p.length
         })));
 
+        // Everything that can put a schema in or out of force — a language, a
+        // switch, a schema landing — comes through here.
+        this.registerSchema();
         this.renderStatus();
 
         // The verdict is an output a canvas app can act on (a Save button's

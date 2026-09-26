@@ -456,7 +456,53 @@ closes on the caret's line, not on the editor.**
 |---|---|---|
 | P1b | 1.3.11, `p.overflow("body")`, reload. **Follow** (the default): open the list on line 2 and on the last line, scroll the form a little with the list open — does it stay on the caret? `p.follow()` shows the scroll events it saw; `p.later(5)` then scroll gives `fromCaret`. Scroll until the editor leaves the view — does the list close? Open the list, switch form tabs — gone, not floating over the other tab? Then `p.follow("hide")`, reload, and the same: does the list close on the first scroll? | Following vs closing on scroll; if neither is clean, completion ships with the list closing on any scroll |
 
+## What building 1.4.0 found
+
+- **A half-typed key hides the key below it.** In the harness, a new `""`
+  typed above an existing `"id": "A-1"` parses as a key missing its colon;
+  the tolerant parser folds the two, `id` drops out of the tree, and the list
+  offered `id` again. `complete.ts` now reads the sibling keys from the
+  document with the half-typed key cut out; the suite pins it, and fails on
+  the old parse.
+- **The list's room comes from the window, not the editor.** Captured in a
+  150px-tall window, the list flipped above the caret and shrank to one row
+  — Monaco's `_layoutBoxInPage` measures the space below against the
+  viewport. `dev/shots.mjs` keeps the completion shot's window at 280px, and
+  says why.
+- The hover and the completion detail wanted different words for the same
+  thing — "default" as a lower-case tag, "Default" as a heading — so they
+  are two resx keys (`Completion_Default`, `Hover_Default`).
+- The overflow node carries `monaco-editor` and reads the theme from there:
+  in `vs-dark` the list and hover render dark under `<body>` with nothing
+  else set (harness, 2026-09-26).
+
+## The 1.4.0 walkthrough
+
+The 1.4.0 zip over 1.3.11 on the Accounts form, the order schema from the
+1.2.9 probe with the descriptions the harness's copy carries.
+
+| # | Ask |
+|---|---|
+| W1 | An empty object, `"` on line 2: the list offers the schema's names, required first, with type and "required" on the highlighted row; Enter inserts `"id": ` with the caret after it. |
+| W2 | `"status": ` — the list opens after the colon with the enum; choosing `status` from the key list inserts the choice snippet. |
+| W3 | A key typed above existing keys: nothing already in the object is offered again. |
+| W4 | The pointer on `status`: description, allowed values, default — above the line, whole. On a key the schema does not describe: no hover. |
+| W5 | **The header** (P1b): open the list, scroll until the editor slides under the form's header — the list closes before it reaches the header. Scroll back a little with it open: it follows the caret. Switch tabs: gone. |
+| W6 | A short field (6 rows): the list on the last line hangs below the field, whole. A 1.3 marker hover on line 1 is no longer cut. |
+| W7 | Two Code Editors, one forced `dark`, one `auto` on a light app: both dark, both strips dark. |
+| W8 | No schema (clear the property): no list anywhere, no hover beyond marker messages. XML: no list. |
+| W9 | P6 — a canvas app with an inline schema (studio and play): does the list open, is it at the caret, does Tab reach it? The phone client: can a suggestion be picked by touch? Neither cuts; the answer goes to the docs. |
+
 ## Not verified
+
+From 1.4.0:
+
+- **Everything in the walkthrough above** until it is answered — the header
+  rule (W5) above all, which follows from P1b rather than being measured.
+- **The follow on a slow machine.** The form fires about eight scroll events
+  per wheel notch; each re-renders the editor while a widget is open. Fine
+  on the test machine's form; unmeasured on a low-end client.
+- **Right-to-left**: the list's placement under `<body>` in an RTL app.
 
 From 1.3.0:
 
@@ -493,6 +539,15 @@ What the 1.1.9 probe left open. None of it holds the release.
 
 The rig shape above — decisions in pure modules, transpiled and asserted
 because the bundle cannot load outside a browser — went to the skill as
-*When the bundle cannot load in Node* under *Prove it with the dev rig*, and
+*When the bundle cannot load in Node* in `references/verification.md`, and
 `_template/dev/smoke.js` points at it. The pcf-scripts loader finding and the
 `exports`-map finding are Monaco- and toolchain-specific and stay here.
+
+From 1.4.0, to the skill: providers that are page-global with per-editor
+configuration in a registry, a contribution imported after the first API
+call being inert, `fixedOverflowWidgets` broken by a form's identity
+transforms, and the widgets under `<body>` that follow the form's scroll —
+*Language features without a worker* in `references/rendering-and-hosts.md`.
+And a finding true of every control, not this one: **a model-driven form
+takes Tab before a control sees it** (P3) — in
+`references/styling-and-accessibility.md`.

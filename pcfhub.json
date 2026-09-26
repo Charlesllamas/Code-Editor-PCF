@@ -97,6 +97,20 @@
         }
       },
       {
+        "slug": "completion",
+        "name": "Suggestions from the schema",
+        "description": "An order with room for more. Type a quote on the empty line — or after the colon of a key — and the schema offers what fits there, required properties first; rest the pointer on a property to read its description. Enter takes a suggestion.",
+        "props": {
+          "code": "{\n  \"id\": 7,\n  \n}",
+          "language": "json",
+          "theme": "auto",
+          "height": 320,
+          "fitContent": false,
+          "validation": "on",
+          "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\",\"title\":\"Order number\",\"description\":\"The number the order was issued under.\"},\"lines\":{\"type\":\"array\",\"description\":\"One entry per product ordered.\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\",\"markdownDescription\":\"The **stock keeping unit**, as printed on the label.\"},\"qty\":{\"type\":\"integer\",\"minimum\":1,\"default\":1,\"description\":\"How many; at least one.\"}}}},\"status\":{\"enum\":[\"open\",\"closed\"],\"default\":\"open\",\"description\":\"Where the order is in its life.\"}},\"additionalProperties\":false}"
+        }
+      },
+      {
         "slug": "dark",
         "name": "Dark, fit to content",
         "description": "Forced dark theme, and the editor sized to its document up to 400px rather than a fixed box.",

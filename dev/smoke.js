@@ -444,6 +444,220 @@ const ribbonFormatted = formatXml(ribbon, TWO);
 check('a ribbon definition keeps its tree', shape(ribbonFormatted), shape(ribbon));
 check('…and is stable', formatXml(ribbonFormatted, TWO), ribbonFormatted);
 
+/* ========================================================= schema navigation */
+
+const nav = load('schemaNav');
+
+/*
+ * One schema exercising what completion and hover walk through: a $ref into
+ * $defs, an allOf, a required list, an enum with a default, a deprecated
+ * property, a forbidden one, a recursive definition, a Markdown and a plain
+ * description.
+ */
+const ORDER = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    type: 'object',
+    required: ['id', 'lines'],
+    properties: {
+        id: { type: 'string', description: 'The order_id, *as issued*.' },
+        status: { title: 'Status', enum: ['open', 'closed', 'void'], default: 'open' },
+        lines: { type: 'array', items: { $ref: '#/$defs/line' } },
+        priority: { type: 'integer', default: 3 },
+        express: { type: 'boolean' },
+        legacy: { type: 'string', deprecated: true },
+        meta: { $ref: '#/$defs/meta' },
+        forbidden: false,
+    },
+    $defs: {
+        line: {
+            type: 'object',
+            required: ['sku'],
+            properties: {
+                sku: { type: 'string', markdownDescription: 'Stock **keeping** unit' },
+                qty: { type: 'integer', minimum: 1, examples: [1, 10] },
+            },
+        },
+        meta: { allOf: [{ properties: { source: { const: 'web' } } }, { properties: { tags: { type: 'array' } } }] },
+        node: { type: 'object', properties: { child: { $ref: '#/$defs/node' }, name: { type: 'string' } } },
+    },
+};
+
+section('schemaNav.ts — which schemas describe a place');
+
+const typesAt = (root, path) => nav.typesOf(nav.schemasAt(root, path));
+check('the root describes the root', typesAt(ORDER, []), ['object']);
+check('a property', typesAt(ORDER, ['id']), ['string']);
+check('an array item through a $ref into $defs', typesAt(ORDER, ['lines', 0]), ['object']);
+check('…and a property inside it', typesAt(ORDER, ['lines', 3, 'qty']), ['integer']);
+check('allOf contributes every part', Array.from(nav.declaredProperties(ORDER, nav.schemasAt(ORDER, ['meta'])).keys()).sort(), ['source', 'tags']);
+check('a property the schema says nothing about', nav.schemasAt(ORDER, ['nope']), []);
+check('a property declared false is not offered', nav.declaredProperties(ORDER, nav.schemasAt(ORDER, [])).has('forbidden'), false);
+
+const NODE = { $ref: '#/$defs/node', $defs: ORDER.$defs };
+check('a recursive definition resolves at depth', typesAt(NODE, ['child', 'child', 'child', 'name']), ['string']);
+const SELF = { $ref: '#' };
+check('a schema that refers to itself terminates', nav.expand(SELF, SELF).length, 1);
+check('a $ref to another file resolves to nothing', nav.resolveRef(ORDER, 'other.json#/x'), undefined);
+check('a pointer with an escaped slash', nav.resolveRef({ 'a/b': 1 }, '#/a~1b'), 1);
+
+const DRAFT4 = { definitions: { n: { type: 'number' } }, items: [{ $ref: '#/definitions/n' }], additionalItems: { type: 'string' } };
+check('draft-04: an items array is a tuple, through definitions', typesAt(DRAFT4, [0]), ['number']);
+check('draft-04: additionalItems past the tuple', typesAt(DRAFT4, [3]), ['string']);
+const TUPLE = { prefixItems: [{ type: 'boolean' }], items: { type: 'null' } };
+check('2020-12: prefixItems, then items', [typesAt(TUPLE, [0]), typesAt(TUPLE, [1])], [['boolean'], ['null']]);
+const PATTERNS = { patternProperties: { '^x-': { type: 'string' } }, additionalProperties: false };
+check('patternProperties match by name', typesAt(PATTERNS, ['x-trace']), ['string']);
+check('…and additionalProperties: false offers nothing else', nav.schemasAt(PATTERNS, ['y']), []);
+check('anyOf offers every branch\'s values', nav.allowedValues(nav.schemasAt({ anyOf: [{ const: 'a' }, { const: 'b' }] }, [])), ['a', 'b']);
+check('if/then/else offers both outcomes', typesAt({ if: {}, then: { type: 'string' }, else: { type: 'number' } }, []).sort(), ['number', 'string']);
+check('true is the empty schema', nav.expand(true, true), [{}]);
+
+check('a plain description is escaped for Markdown', nav.escapeMarkdown('order_id *x*'), 'order\\_id \\*x\\*');
+check('documentation: title, then the description', nav.documentation(nav.schemasAt(ORDER, ['status'])), '**Status**');
+check('a markdownDescription stays Markdown', nav.documentation(nav.schemasAt(ORDER, ['lines', 0, 'sku'])), 'Stock **keeping** unit');
+
+/* ============================================================== completion */
+
+const { complete, valuePlaceholder } = load('complete');
+const LABELS = { required: 'required', deprecated: 'deprecated', defaultValue: 'default', allowedValues: 'Allowed values', defaultHeading: 'Default' };
+
+/** A document with `|` where the caret is: the text without it, and the offset. */
+function caret(marked) {
+    const offset = marked.indexOf('|');
+    return [marked.slice(0, offset) + marked.slice(offset + 1), offset];
+}
+function suggest(marked, root) {
+    root = arguments.length > 1 ? root : ORDER; // a default would swallow an explicit undefined
+    const [text, offset] = caret(marked);
+    return complete(text, offset, root, LABELS);
+}
+const byName = (list, label) => list.find((s) => s.label === label);
+const inOrder = (list) => list.slice().sort((a, b) => (a.sortText < b.sortText ? -1 : a.sortText > b.sortText ? 1 : 0)).map((s) => s.label);
+
+section('complete.ts — where jsonc-parser says the caret is (3.3.1, measured)');
+
+const { getLocation } = require('jsonc-parser');
+check('a fresh line in an object is a key position, path [""]', (() => { const l = getLocation('{\n  \n}', 4); return [l.path, l.isAtPropertyKey]; })(), [[''], true]);
+check('a key being typed is a "property" node, quotes included', (() => { const l = getLocation('{"pro"}', 4); return [l.previousNode.type, l.previousNode.offset, l.previousNode.length]; })(), ['property', 1, 5]);
+check('an array slot after a comma claims to be a key position — the segment says otherwise', (() => { const l = getLocation('{"lines": [ {}, ]}', 15); return [l.path, l.isAtPropertyKey]; })(), [['lines', 1], true]);
+
+section('complete.ts — property names');
+
+const fresh = suggest('{\n  |\n}');
+check('every declared property but the forbidden one', fresh.map((s) => s.label).sort(), ['express', 'id', 'legacy', 'lines', 'meta', 'priority', 'status']);
+check('required first, deprecated last', inOrder(fresh), ['id', 'lines', 'express', 'meta', 'priority', 'status', 'legacy']);
+check('a required property says so, with its type', byName(fresh, 'id').detail, 'string · required');
+check('a deprecated one is tagged', [byName(fresh, 'legacy').deprecated, byName(fresh, 'legacy').detail], [true, 'string · deprecated']);
+check('a key already in the object is not offered again', suggest('{"id": "a", |}').some((s) => s.label === 'id'), false);
+check('…but the key under the caret still is', suggest('{"i|d": "a"}').some((s) => s.label === 'id'), true);
+check('a new key typed above an existing one does not hide it (the harness, 2026-09-26)', suggest('{\n  "|"\n  "id": "A-1",\n  "lines": []\n}').map((s) => s.label).sort(), ['express', 'legacy', 'meta', 'priority', 'status']);
+
+check('a string inserts empty quotes with the caret inside', byName(fresh, 'id').insertText, '"id": "$1"');
+check('an enum of strings inserts a choice', byName(fresh, 'status').insertText, '"status": ${1|"open","closed","void"|}');
+check('a default is the placeholder', byName(fresh, 'priority').insertText, '"priority": ${1:3}');
+check('a boolean', byName(fresh, 'express').insertText, '"express": ${1:false}');
+check('an array', byName(fresh, 'lines').insertText, '"lines": [$1]');
+check('a $ref\'d object', byName(fresh, 'meta').insertText, '"meta": $1');
+check('a single allowed value is inserted as itself', valuePlaceholder([{ const: 'web' }]), '"web"');
+check('snippet syntax in a default is escaped', valuePlaceholder([{ default: 'a$b}c' }]), '${1:"a\\$b\\}c"}');
+
+const typed = suggest('{"st|"}');
+check('inside quotes: the quoted key is replaced whole', [byName(typed, 'status').start, byName(typed, 'status').end], [1, 5]);
+check('…and filtered with its quotes', byName(typed, 'status').filterText, '"status"');
+check('renaming a key keeps its colon and value', byName(suggest('{"st|": 1}'), 'status').insertText, '"status"');
+check('a property that has one after it gets a comma', byName(suggest('{\n  |\n  "id": "a"\n}'), 'status').insertText.endsWith(','), true);
+check('a bare word is replaced from its start', (() => { const s = byName(suggest('{ sta| }'), 'status'); return [s.start, s.end]; })(), [2, 5]);
+
+check('inside an array item, the item\'s own properties', suggest('{"lines": [ { | } ]}').map((s) => s.label).sort(), ['qty', 'sku']);
+check('…with its own required first', inOrder(suggest('{"lines": [ { | } ]}')), ['sku', 'qty']);
+check('a plain description arrives escaped', byName(fresh, 'id').documentation, 'The order\\_id, \\*as issued\\*\\.');
+
+section('complete.ts — values');
+
+const values = suggest('{"status": |}');
+check('an enum after the colon', values.map((s) => s.label), ['"open"', '"closed"', '"void"']);
+check('the default says so', byName(values, '"open"').detail, 'default');
+const inString = suggest('{"status": "o|"}');
+check('inside a string value: the string is replaced whole', [byName(inString, '"open"').start, byName(inString, '"open"').end], [11, 14]);
+check('examples, where there is no enum', suggest('{"lines": [ { "qty": | } ]}').map((s) => s.label), ['1', '10']);
+check('a boolean offers both', suggest('{"express": |}').map((s) => s.label), ['true', 'false']);
+check('an array offers an empty one, caret inside', byName(suggest('{"lines": |}'), '[]').insertText, '[$1]');
+check('a place the schema says nothing about offers nothing', suggest('{"nope": |}'), []);
+check('the root of an empty document offers an object', suggest('|').map((s) => s.label), ['{}']);
+
+section('complete.ts — no schema, no list');
+
+check('false as the schema', suggest('{\n  |\n}', false), []);
+check('undefined as the schema', suggest('{\n  |\n}', undefined), []);
+check('an empty schema offers no names', suggest('{\n  |\n}', {}), []);
+
+/* ================================================================== hover */
+
+const { hover } = load('hover');
+function hoverAt(marked, root) {
+    root = arguments.length > 1 ? root : ORDER;
+    const [text, offset] = caret(marked);
+    return hover(text, offset, root, LABELS);
+}
+
+section('hover.ts — what the schema says under the pointer');
+
+const onKey = hoverAt('{"i|d": "a", "lines": []}');
+check('on a key: the key is the range', [onKey.offset, onKey.length], [1, 4]);
+check('…and the text is the description, the type, required', onKey.markdown, 'The order\\_id, \\*as issued\\*\\.\n\n`string` · required');
+check('on a value: its allowed values and default', hoverAt('{"status": "o|pen"}').markdown, '**Status**\n\nAllowed values: `"open"`, `"closed"`, `"void"`\n\nDefault: `"open"`');
+check('deprecated says so', hoverAt('{"leg|acy": "x"}').markdown, '`string` · deprecated');
+check('inside an array item, through the $ref', hoverAt('{"lines": [ { "s|ku": "x" } ]}').markdown, 'Stock **keeping** unit\n\n`string` · required');
+check('a key the schema does not describe has no hover', hoverAt('{"zz|z": 1}'), null);
+check('no schema, no hover', hoverAt('{"i|d": 1}', undefined), null);
+const many = { enum: Array.from({ length: 14 }, (_, i) => i) };
+check('a long enum is cut at ten, and says how many more', hoverAt('|1', many).markdown, 'Allowed values: `0`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, … (+4)');
+
+/* =================================================================== clip */
+
+const clip = load('clip');
+const VIEW = { top: 0, left: 0, bottom: 800, right: 1000 };
+
+section('clip.ts — whether the caret\'s line can be seen (SPEC.md P1b)');
+
+check('two rectangles that do not meet', clip.intersect({ top: 0, left: 0, bottom: 10, right: 10 }, { top: 20, left: 0, bottom: 30, right: 10 }), null);
+const form = clip.visibleArea(VIEW, [{ top: 120, left: 0, bottom: 1400, right: 900 }, { top: 60, left: 20, bottom: 780, right: 880 }]);
+check('what survives the viewport and every clip', form, { top: 120, left: 20, bottom: 780, right: 880 });
+check('a line inside it is visible', clip.lineVisible(form, { top: 300, bottom: 319 }), true);
+check('a line under the header (above the scroll container) is not', clip.lineVisible(form, { top: 100, bottom: 119 }), false);
+check('half a line under the header is not either', clip.lineVisible(form, { top: 110, bottom: 129 }), false);
+check('a pixel of rounding is forgiven', clip.lineVisible(form, { top: 119.5, bottom: 138 }), true);
+check('below the fold is not', clip.lineVisible(form, { top: 790, bottom: 809 }), false);
+check('nothing visible at all', clip.lineVisible(clip.visibleArea(VIEW, [{ top: 900, left: 0, bottom: 1000, right: 10 }]), { top: 950, bottom: 960 }), false);
+
+/* ============================================================ page theme */
+
+const { pageTheme } = load('theme');
+
+section('theme.ts — one theme per page, and who decides it');
+
+check('no controls: light', pageTheme([]), 'vs');
+check('auto on a dark app', pageTheme([{ preference: 'auto', isDarkTheme: true }]), 'vs-dark');
+check('forced dark beside auto on a light app: dark (the P5 form)', pageTheme([{ preference: 'dark' }, { preference: 'auto', isDarkTheme: false }]), 'vs-dark');
+check('…whichever arrived first', pageTheme([{ preference: 'auto', isDarkTheme: false }, { preference: 'dark' }]), 'vs-dark');
+check('two forced themes: the last to arrive', pageTheme([{ preference: 'dark' }, { preference: 'Light' }]), 'vs');
+check('two autos read the same app', pageTheme([{ preference: null, isDarkTheme: false }, { preference: 'auto', isDarkTheme: false }]), 'vs');
+
+/* ============================================================== registry */
+
+const { schemaRegistry } = load('schemaRegistry');
+// fromText is loaded with the schemaLoader sections above.
+
+section('schemaRegistry.ts, schemaLoader.ts — a schema filed per editor');
+
+check('a loaded schema carries the parsed document for completion', fromText('{"type":"object"} // a comment').schema, { type: 'object' });
+schemaRegistry.set('inmemory://model/1', { schema: ORDER, labels: LABELS });
+schemaRegistry.set('inmemory://model/2', { schema: { type: 'object' }, labels: LABELS });
+check('two editors, two schemas (SPEC.md P5)', [schemaRegistry.get('inmemory://model/1').schema === ORDER, schemaRegistry.get('inmemory://model/2').schema.type], [true, 'object']);
+schemaRegistry.delete('inmemory://model/1');
+schemaRegistry.delete('inmemory://model/2');
+check('destroy leaves nothing behind', [schemaRegistry.size, schemaRegistry.get('inmemory://model/1')], [0, undefined]);
+
 /* ================================================================= verdict */
 
 loaderChecks().then(verdict, (error) => {
