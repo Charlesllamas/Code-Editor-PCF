@@ -375,6 +375,29 @@ instance, not the schema).
 
 | # | Ask | Cuts |
 |---|---|---|
+**P1b answered (1.3.11, 2026-09-26) — `body` with `follow` ships, and
+closes on the caret's line, not on the editor.**
+
+- **Follow keeps the widget on the caret through the form's scroll:**
+  `fromCaret` `below: 0`, `placed: true` on line 2 and on the last line, the
+  list moving with the editor. The scroll events came from
+  `div#tab-section0` — the form's scroll container, not the window — eight
+  in 50 ms per wheel notch, each one re-rendering the editor.
+- Scrolled until the editor left the view, the list closed; a form-tab
+  switch closed it too (the IntersectionObserver, logged as "editor out of
+  view"). `hide` closed it on the first scroll, as designed.
+- **What follow got wrong: the form's header.** Scrolled so the editor slid
+  under the sticky header, the list stayed on the caret — *over the header*,
+  since the editor was still partly in view and the observer fires only when
+  it leaves entirely. The header sits above `tab-section0`, which clips the
+  editor, so **1.4.0 closes the widgets once the caret's line leaves the
+  visible part of the form**: the intersection of every clipping ancestor's
+  rect, the same walk the probe's `clippedBy` makes, computed per scroll in
+  a pure module. W-list item, since it follows from this answer rather than
+  asking a new question.
+
+| # | Ask | Cuts |
+|---|---|---|
 | P1b | 1.3.11, `p.overflow("body")`, reload. **Follow** (the default): open the list on line 2 and on the last line, scroll the form a little with the list open — does it stay on the caret? `p.follow()` shows the scroll events it saw; `p.later(5)` then scroll gives `fromCaret`. Scroll until the editor leaves the view — does the list close? Open the list, switch form tabs — gone, not floating over the other tab? Then `p.follow("hide")`, reload, and the same: does the list close on the first scroll? | Following vs closing on scroll; if neither is clean, completion ships with the list closing on any scroll |
 
 ## Not verified
