@@ -413,6 +413,26 @@ closes on the caret's line, not on the editor.**
   tab was not read and did not need to be: 1.3's failing `?esm` fetch sits
   behind `getWorker`, which was never called.
 
+- **P3 — every key reaches the editor except Tab, which the form keeps.**
+  Ctrl+Space opens the list; Escape closes the list and nothing else; Enter
+  with the list open inserts the item, and without it starts a new line
+  (`acceptSuggestionOnEnter: "smart"` as designed); picking `probeStatus`
+  inserted the snippet and its `draft|active|closed` choice worked. **Tab
+  with the list open closed it and moved focus to the strip's Format
+  button**, and Ctrl+M changed nothing. Settled with the key log after a
+  reload: Tab, then Space → `["Space"]` — **Tab never reaches Monaco on a
+  model-driven form**; the form moves focus first. Ctrl+M reaches the editor
+  (logged each time) and toggles a Tab-focus mode that no Tab arrives to use.
+  The dev harness lets Tab through (Tab accepted `probeId` there), so this is
+  the form's alone.
+
+  So 1.4.0 documents **Enter** as the key that takes a suggestion, and Tab
+  as the form's key for the next field — the accessible default, not a
+  loss. `docs/limitations.md`'s "`Ctrl+M` releases `Tab`" (from 1.2.0, never
+  measured) is wrong on a model-driven form and is rewritten in the 1.4.0
+  docs pass; `monacoFeatures.ts` keeps `toggleTabFocusMode` for canvas,
+  where Tab is unmeasured (P6).
+
 | # | Ask | Cuts |
 |---|---|---|
 | P1b | 1.3.11, `p.overflow("body")`, reload. **Follow** (the default): open the list on line 2 and on the last line, scroll the form a little with the list open — does it stay on the caret? `p.follow()` shows the scroll events it saw; `p.later(5)` then scroll gives `fromCaret`. Scroll until the editor leaves the view — does the list close? Open the list, switch form tabs — gone, not floating over the other tab? Then `p.follow("hide")`, reload, and the same: does the list close on the first scroll? | Following vs closing on scroll; if neither is clean, completion ships with the list closing on any scroll |
