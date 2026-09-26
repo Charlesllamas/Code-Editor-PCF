@@ -46,6 +46,16 @@ import "monaco-editor/editor/contrib/gotoError/browser/gotoError";
 import "monaco-editor/editor/contrib/gotoError/browser/markerSelectionStatus";
 import "monaco-editor/editor/contrib/readOnlyMessage/browser/contribution";
 
+// Completion. Here and not beside the provider, because a contribution's
+// services are registered when its module is evaluated and read once, on the
+// first monaco.editor / monaco.languages call -- which monacoSetup.ts makes
+// at load. Imported after that, SuggestController throws "depends on UNKNOWN
+// service ISuggestMemories" on every editor and the list never opens
+// (measured in the harness, 2026-09-26). The snippet controller is what
+// places the caret inside an inserted snippet.
+import "monaco-editor/editor/contrib/suggest/browser/suggestController";
+import "monaco-editor/editor/contrib/snippet/browser/snippetController2";
+
 // Accessibility and the platform's clients: Ctrl+M releases Tab for the
 // form's own focus order, F1 lists every command, Ctrl+G goes to a line, and
 // the iPad keyboard button matters on the tablet client.

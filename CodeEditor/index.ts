@@ -6,6 +6,8 @@ import { resolveHeight, resolveWidth, STATUS_BAR_HEIGHT } from "./sizing";
 import { MonacoTheme, resolveTheme } from "./theme";
 import { resolveSchemaSource } from "./schema";
 import { fromText, loadWebResourceSchema, SchemaStatus, schemaStatusText, schemaWithholdsVerdict } from "./schemaLoader";
+// THROWAWAY: the 1.3.9 probe (SPEC.md P1–P6). Remove with probe.ts before 1.4.0.
+import * as probe from "./probe";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -84,7 +86,10 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._code = context.parameters.code.raw ?? null;
         this._language = resolveLanguage(context.parameters.language.raw);
 
+        // THROWAWAY (probe): the overflow mode P1 compares.
+        const { __body: probeBody, ...probeOptions } = probe.createOptions();
         this._editor = monaco.editor.create(this._editorHost, {
+            ...probeOptions,
             value: this._code ?? "",
             language: this._language,
             readOnly: this._readOnly,
@@ -115,6 +120,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this.layout(context);
         this.readSchema(context);
         this.runValidate();
+        probe.park(this._editor, this._editorHost, () => this._schemaRaw ?? null, probeBody);
     }
 
     /**
@@ -188,6 +194,9 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         if (this._validateTimer !== undefined) {
             window.clearTimeout(this._validateTimer);
             this._validateTimer = undefined;
+        }
+        if (this._editor) {
+            probe.unpark(this._editor);
         }
         const model = this._editor?.getModel();
         if (model) {

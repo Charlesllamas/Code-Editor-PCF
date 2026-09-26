@@ -281,6 +281,60 @@ canvas-only because binding one breaks the classic form's save.
 - **W4 — Format on XML.** `fetchxml.xml` with `language` = `xml`: the
   Format button laid it out.
 
+## The 1.3.9 probe — asked before 1.4.0 is written
+
+1.4.0 completes property names and values from the JSON Schema already in
+force, and shows a property's description on hover — both on the main
+thread, through providers registered for JSON, with the suggest and snippet
+contributions added to `monacoFeatures.ts`. Suggestions open as you type, as
+VS Code does; no new property, since nothing appears without a schema.
+`probe.ts` registers a static provider and a markdown hover with the options
+1.4.0 means to ship, and parks `window.__pcfCodeEditorProbe`; each answer
+lands below, verbatim and dated, and **a wrong answer removes the feature it
+names**.
+
+**What the harness already answered, 2026-09-26:**
+
+- **A contribution imported after the first Monaco API call is inert.**
+  Imported from `probe.ts`, the suggest controller threw *"SuggestController
+  depends on UNKNOWN service ISuggestMemories"* on every editor and the list
+  never opened: a contribution's services are registered when its module is
+  evaluated and read once, on the first `monaco.editor`/`monaco.languages`
+  call, which `monacoSetup.ts` makes at load. Moved to `monacoFeatures.ts`,
+  it works.
+- **`.CodeEditor-editor`'s `overflow: hidden` clips Monaco's overflow
+  widgets.** A hover on line 2 lost its top 138px — which is true of 1.3's
+  marker hovers today. `fixedOverflowWidgets` fixes both the hover and the
+  list in the harness; so does `overflowWidgetsDomNode` on a node under
+  `<body>` carrying `monaco-editor`.
+- **Monaco reads both overflow options at creation only**; `updateOptions`
+  changes nothing. So the probe chooses the mode from `localStorage` before
+  the form loads (`p.overflow("fixed" | "body" | "none")`, then reload).
+- Markdown in a hover renders (emphasis, code, a list, a code block); a
+  `supportHtml: false` string loses its tags rather than showing them. No
+  CSP violation, no warning, no `getWorker` call with
+  `wordBasedSuggestions: "off"`.
+
+Set-up on the test environment: the 1.3.9 zip imported over 1.3.1 on the
+Accounts form; the Code Editor with `language` = `json` and the
+`cll_/probe/order.schema.json` schema from P1 of 1.2.9. For P5, a second Code
+Editor on the same form bound to another multiline column, with an inline
+schema (`{"type":"object"}` is enough — the probe's items name their
+instance, not the schema).
+
+| # | Ask | Cuts |
+|---|---|---|
+| P1 | For each of `p.overflow("none")`, `"fixed"`, `"body"` (reload after each): type `"` on the last line of a **short** field (the designer's height at 6 rows) and on line 2 of a tall one; `await p.suggest()` and `await p.hover()` — `seen` all true, `clippedBy` empty? Then scroll the form while the list is open: does a fixed list follow the editor or stay behind? And the reading pane / a tab switch with the list open. | Which overflow mode ships; if none shows the list whole on the form, completion is Ctrl+Space only and the hover keeps 1.3's clip |
+| P2 | `await p.hover()` on the form: `hasEm`, `hasCode`, `hasList` true, `violations` empty, and `p.env().trustedTypes` / `ttPolicies`. Anything new in the console? | Markdown hover; plain text instead |
+| P3 | Type in the field: Ctrl+Space opens the list (`p.keys()` shows it arrived); Escape closes the list and nothing else (the form stays, no dialog closes); Enter with **no** list open inserts a newline; Enter and Tab with the list open insert the item; Ctrl+M still releases Tab. | The keys the docs promise; Ctrl+Space advertised or not |
+| P4 | `p.console()` after P1–P3: `getWorker` and `workerWarning` counts, and the network tab for any `?esm` or worker request. | `wordBasedSuggestions: "off"` as the whole answer |
+| P5 | With the two editors: `await p.each()` — each list's first item names its own instance. Then switch to another form tab and back: `p.env().instances` lists two, not four (`destroy` unregistered the first pair). | The registry keyed by model URI |
+| P6 | Not blocking: the canvas app's Code Editor (studio and play) and the phone client — does the list open, and can it be picked by touch? | Goes to *Not verified* or `docs/limitations.md`, never cuts |
+
+### Answers
+
+*Pending.*
+
 ## Not verified
 
 From 1.3.0:
