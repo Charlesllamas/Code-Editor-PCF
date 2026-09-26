@@ -10,7 +10,9 @@
 //
 //     const p = window.__pcfCodeEditorProbe
 //     p.env()                    what the page is: CSP, Trusted Types, instances
-//     await p.suggest()          P1: open the list, measure it against its ancestors
+//     await p.suggest()          P1: open the list at the end of line 2, measure it
+//     await p.suggest(1, "last") P1: the same on the last line
+//     p.measure()                P1: measure a list or hover you opened by hand
 //     await p.hover()            P1, P2: open a hover, measure it, read what rendered
 //     p.overflow("fixed")        P1: then reload the form, and suggest/hover again
 //     p.overflow("body")         P1: the same with the widgets outside the control
@@ -284,12 +286,16 @@ function first(): Instance | undefined {
     return instances.values().next().value;
 }
 
-async function suggestOn(instance: Instance): Promise<unknown> {
-    // A caret the user could have put there: the end of line 2, or line 1.
+/** "last" is the last line — where a short field's list has to open past its bottom edge. */
+type Line = number | "last";
+
+async function suggestOn(instance: Instance, at: Line = 2): Promise<unknown> {
+    // A caret the user could have put there: the end of the line asked for.
     // Triggered with the caret wherever the last scripted step left it, the
     // widget was marked visible and never positioned (harness, 2026-09-26).
     const model = instance.editor.getModel();
-    const line = model && model.getLineCount() > 1 ? 2 : 1;
+    const count = model ? model.getLineCount() : 1;
+    const line = at === "last" ? count : Math.min(Math.max(1, at), count);
     instance.editor.focus();
     instance.editor.setPosition({ lineNumber: line, column: model ? model.getLineMaxColumn(line) : 1 });
     instance.editor.revealLine(line);
@@ -297,10 +303,16 @@ async function suggestOn(instance: Instance): Promise<unknown> {
     // The list lays itself out after it becomes visible; measured at 400 ms
     // the hit test missed a list that was plainly on screen.
     await wait(800);
+    return { line, ...measureSuggest(instance) };
+}
+
+/** The open list, measured as it stands: whoever opened it. */
+function measureSuggest(instance: Instance): Record<string, unknown> {
     const widget = instance.host.ownerDocument.querySelector(".suggest-widget.visible") as HTMLElement | null;
     const labels = widget ? Array.from(widget.querySelectorAll(".monaco-list-row .label-name")).map((n) => n.textContent) : [];
     return {
         instance: instance.index,
+        mode: overflowMode(),
         visible: !!widget,
         position: widget ? getComputedStyle(widget).position : null,
         insideHost: widget ? instance.host.contains(widget) : null,
@@ -310,6 +322,17 @@ async function suggestOn(instance: Instance): Promise<unknown> {
         clippedBy: widget ? clipping(widget) : [],
         seen: widget ? seen(widget) : null,
         labels
+    };
+}
+
+/** The open hover, measured as it stands. */
+function measureHover(): Record<string, unknown> {
+    const hover = document.querySelector(".monaco-hover:not(.hidden)") as HTMLElement | null;
+    return {
+        visible: !!hover,
+        widget: rect(hover),
+        clippedBy: hover ? clipping(hover) : [],
+        seen: hover ? seen(hover) : null
     };
 }
 
@@ -340,10 +363,16 @@ const probe = {
         };
     },
 
-    /** P1: open the list on the first instance (or the one given) and measure it. */
-    async suggest(index?: number) {
+    /** P1: open the list at the end of a line (2 by default, or "last") and measure it. */
+    async suggest(index?: number, line?: Line) {
         const instance = index ? Array.from(instances.values()).find((i) => i.index === index) : first();
-        return instance ? suggestOn(instance) : "no instance";
+        return instance ? suggestOn(instance, line) : "no instance";
+    },
+
+    /** P1: measure the list and the hover you opened by hand — nothing is triggered. */
+    measure(index?: number) {
+        const instance = index ? Array.from(instances.values()).find((i) => i.index === index) : first();
+        return instance ? { suggest: measureSuggest(instance), hover: measureHover() } : "no instance";
     },
 
     /** P1: the overflow mode for the next load — "none", "fixed" or "body". Reload after. */

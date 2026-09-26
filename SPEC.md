@@ -310,13 +310,19 @@ names**.
 - **Monaco reads both overflow options at creation only**; `updateOptions`
   changes nothing. So the probe chooses the mode from `localStorage` before
   the form loads (`p.overflow("fixed" | "body" | "none")`, then reload).
+- **On a short field the list on the last line is not clipped — it is
+  gone.** At a 96px editor in mode `none`, every hit point of the list was
+  covered (cut 99px at the editor's bottom edge); in `fixed` it hangs below
+  the editor over the strip, whole. A form's field is often that short.
 - Markdown in a hover renders (emphasis, code, a list, a code block); a
   `supportHtml: false` string loses its tags rather than showing them. No
   CSP violation, no warning, no `getWorker` call with
   `wordBasedSuggestions: "off"`.
 
-Set-up on the test environment: the 1.3.9 zip imported over 1.3.1 on the
-Accounts form; the Code Editor with `language` = `json` and the
+Set-up on the test environment: the probe zip imported over 1.3.1 on the
+Accounts form — **1.3.10**, the second cut, which adds `p.suggest(n, "last")`
+and `p.measure()`; 1.3.9 could not open the list on a field's last line,
+which is the case P1 is about; the Code Editor with `language` = `json` and the
 `cll_/probe/order.schema.json` schema from P1 of 1.2.9. For P5, a second Code
 Editor on the same form bound to another multiline column, with an inline
 schema (`{"type":"object"}` is enough — the probe's items name their
@@ -324,7 +330,7 @@ instance, not the schema).
 
 | # | Ask | Cuts |
 |---|---|---|
-| P1 | For each of `p.overflow("none")`, `"fixed"`, `"body"` (reload after each): type `"` on the last line of a **short** field (the designer's height at 6 rows) and on line 2 of a tall one; `await p.suggest()` and `await p.hover()` — `seen` all true, `clippedBy` empty? Then scroll the form while the list is open: does a fixed list follow the editor or stay behind? And the reading pane / a tab switch with the list open. | Which overflow mode ships; if none shows the list whole on the form, completion is Ctrl+Space only and the hover keeps 1.3's clip |
+| P1 | For each of `p.overflow("none")`, `"fixed"`, `"body"` (reload after each): on a **short** field (the designer's height at 6 rows), `await p.suggest(1, "last")`; on a tall one, `await p.suggest()`; and `await p.hover()` — `seen` all true, `clippedBy` empty? Then type `"` on the last line by hand and `p.measure()`. Then scroll the form while the list is open: does a fixed list follow the editor or stay behind? And the reading pane / a tab switch with the list open. | Which overflow mode ships; if none shows the list whole on the form, completion is Ctrl+Space only and the hover keeps 1.3's clip |
 | P2 | `await p.hover()` on the form: `hasEm`, `hasCode`, `hasList` true, `violations` empty, and `p.env().trustedTypes` / `ttPolicies`. Anything new in the console? | Markdown hover; plain text instead |
 | P3 | Type in the field: Ctrl+Space opens the list (`p.keys()` shows it arrived); Escape closes the list and nothing else (the form stays, no dialog closes); Enter with **no** list open inserts a newline; Enter and Tab with the list open insert the item; Ctrl+M still releases Tab. | The keys the docs promise; Ctrl+Space advertised or not |
 | P4 | `p.console()` after P1–P3: `getWorker` and `workerWarning` counts, and the network tab for any `?esm` or worker request. | `wordBasedSuggestions: "off"` as the whole answer |
