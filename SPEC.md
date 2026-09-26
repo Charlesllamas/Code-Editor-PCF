@@ -433,6 +433,25 @@ closes on the caret's line, not on the editor.**
   docs pass; `monacoFeatures.ts` keeps `toggleTabFocusMode` for canvas,
   where Tab is unmeasured (P6).
 
+- **P5 — two editors keep their own lists.** A second Code Editor on the
+  same tab (inline schema `{"type":"object"}`): `p.env().instances` listed
+  two, each with its own schema; `p.each()` gave `probeId (instance 1)` and
+  `probeId (instance 2)`, five items each; typed by hand in the second, its
+  list said instance 2; after a form-tab switch and back, still two —
+  `destroy` unregistered the first pair. The registry keyed by model URI
+  holds.
+- **Found beside P5: the strip and the editor disagree on theme.** The first
+  editor forced `dark`, the second `auto` on a light app: both editors
+  rendered light — Monaco's theme is one per page, the last `setTheme` wins,
+  as `docs/limitations.md` says — but **the first editor's strip stayed
+  dark**, because the strip follows its own control's resolved theme
+  (`data-theme` on the root), not the page's. A light editor over a dark
+  strip is a combination nobody configured. 1.4.0: a forced theme outranks
+  `auto` (a maker who forced one and left the other on `auto` meant the
+  forced one; two conflicting forced themes still go to the last to render),
+  and every strip follows the theme in force, through a page-level registry
+  in `theme.ts`. W-list item.
+
 | # | Ask | Cuts |
 |---|---|---|
 | P1b | 1.3.11, `p.overflow("body")`, reload. **Follow** (the default): open the list on line 2 and on the last line, scroll the form a little with the list open — does it stay on the caret? `p.follow()` shows the scroll events it saw; `p.later(5)` then scroll gives `fromCaret`. Scroll until the editor leaves the view — does the list close? Open the list, switch form tabs — gone, not floating over the other tab? Then `p.follow("hide")`, reload, and the same: does the list close on the first scroll? | Following vs closing on scroll; if neither is clean, completion ships with the list closing on any scroll |
