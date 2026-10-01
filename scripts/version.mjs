@@ -227,6 +227,7 @@ for (const location of locations) {
     console.log(`  ${dryRun ? 'would set' : 'set'}  ${rel(location.path).padEnd(52)} ${location.version} → ${next}`);
 }
 
+syncLocks();
 migrationPage();
 limitationsPage();
 
@@ -249,9 +250,9 @@ function collect() {
             /*
              * Every package.json in the tree, not just the root one:
              * `add-control.mjs` writes one per control project, and CI does
-             * not check those at all. package-lock.json is deliberately left
-             * alone — npm rewrites it, and a hand-edited lock is worse than a
-             * stale one.
+             * not check those at all. Its package-lock.json is not a location
+             * — nothing reads a version from it — but `syncLocks` sets its
+             * own two version fields beside it; see there for why.
              */
             found.push({
                 path,
@@ -297,6 +298,60 @@ function collect() {
     }
 
     return found.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * The lock's own `version` and `packages[""].version`, beside each
+ * package.json — those two fields and nothing else.
+ *
+ * This used to be left alone, on the reasoning that npm rewrites the lock and
+ * a hand-edited one is worse than a stale one. The first half is the problem:
+ * the solution pack's `/restore` runs npm, which rewrites exactly these two
+ * fields, so every pack after a bump left the tree dirty — Code-Editor-PCF
+ * 1.4.9 (2026-10-01), and pcf-data-table synced its lock to 0.7.0 in a commit
+ * *after* the tag (2026-09-27). Writing the two fields npm would write, from
+ * a parse, in npm's own format, is not a hand edit of the dependency tree; a
+ * lock that does not parse is left as it is.
+ */
+function syncLocks() {
+    for (const location of locations.filter((l) => basename(l.path) === 'package.json')) {
+        const lock = join(dirname(location.path), 'package-lock.json');
+
+        if (!existsSync(lock)) {
+            continue;
+        }
+
+        const before = readFileSync(lock, 'utf8');
+        let parsed;
+
+        try {
+            parsed = JSON.parse(before);
+        } catch {
+            console.log(`  left ${rel(lock)} as it is: it does not parse`);
+            continue;
+        }
+
+        if (parsed.version !== undefined) {
+            parsed.version = next;
+        }
+        if (parsed.packages && parsed.packages[''] && parsed.packages[''].version !== undefined) {
+            parsed.packages[''].version = next;
+        }
+
+        const indent = /^\{\r?\n(\s+)"/.exec(before)?.[1] ?? '  ';
+        const newline = before.includes('\r\n') ? '\r\n' : '\n';
+        const after = JSON.stringify(parsed, null, indent).replace(/\n/g, newline) + (before.endsWith('\n') ? newline : '');
+
+        if (after === before) {
+            continue;
+        }
+
+        if (!dryRun) {
+            writeFileSync(lock, after);
+        }
+
+        console.log(`  ${dryRun ? 'would set' : 'set'}  ${rel(lock).padEnd(52)} its own two version fields → ${next}`);
+    }
 }
 
 /**
