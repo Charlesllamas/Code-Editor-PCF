@@ -676,7 +676,36 @@ options) and none after.
   drives `metadata.ts` through the stub, the harness and the shots page answer
   `/api/data` from it, so all three agree with each other and with P1–P5.
 
+## The 1.5.0 walkthrough
+
+The 1.5.0 zip over 1.4.9 on the Accounts form; the Code Editor with
+`language` = `fetchxml` (a second one, `json` with the order schema, for W9).
+Production bundle 4,361,840 bytes.
+
+| # | Ask |
+|---|---|
+| W1 | The strip says **FetchXML**. Inside `<entity name="account">`, `<` offers attribute, all-attributes, no-attrs, order, filter, link-entity. |
+| W2 | In `<attribute name="` account's columns, each with its display name on the right; typing filters by either name; Enter inserts the logical name. No `…name` shadow columns. |
+| W3 | In `<link-entity name="` the joins first (`contactid = primarycontactid` …): picking one fills `from` and `to`. Inside that link-entity, `<attribute name="` lists contact's columns. |
+| W4 | `<condition attribute="industrycode" operator="eq" value="` offers the industries by label and inserts the number. On `createdon`, `operator="` puts the date operators before `like`. |
+| W5 | With a link-entity aliased `c`, `entityname="` offers `c`. |
+| W6 | Hover on a column (display name, `account.name`, type, description), an operator (what it does, what it takes) and a table. |
+| W7 | `<attribute name="nmae" />` → amber, not counted; `<atribute …>` → red, counted (`problemCount` 1); a broken tag shows only the XML fault. |
+| W8 | Network tab, from a fresh load: one `EntityDefinitions?…` list request when a table name is first completed, one `…/Attributes` per table, one relationships request per table a link-entity is completed under, one cast per choice column — and none repeated while editing. The first column list's wait on a cold load. |
+| W9 | Unchanged: an `xml` editor offers nothing; the `json` editor with a schema completes as 1.4.0 did; both on one form keep their own lists. |
+| W10 | Offline in DevTools before the first completion: FetchXML's own elements still complete, and the strip says the table definitions could not be read. |
+| W11 | Not blocking: a canvas app with `language` = `fetchxml` — elements and operators complete, no `api/data` request in the Network tab, nothing in the strip. |
+
 ## Not verified
+
+From 1.5.0:
+
+- **Which fixed-list values the server refuses** — a mistyped `link-type`,
+  filter `type` or `aggregate` — and whether a missing required attribute or
+  a second `<entity>` is refused. All are warnings until measured, so nothing
+  is stricter than the server was seen to be.
+- **How many values an operator was given** is not checked.
+- **The phone client**, and right-to-left.
 
 From the 1.4.9 probe:
 
