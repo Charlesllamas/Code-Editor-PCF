@@ -138,6 +138,7 @@
                 <select id="harness-language">
                     <option value="json">json</option>
                     <option value="xml">xml</option>
+                    <option value="fetchxml">fetchxml</option>
                     <option value="javascript">javascript</option>
                     <option value="sql">sql</option>
                     <option value="plaintext">plaintext</option>
@@ -224,8 +225,20 @@
                 </select>
             </label>
 
+            <label>
+                Table definitions (FetchXML)
+                <select id="harness-metadata">
+                    <option value="ready">read (the rig's fixture)</option>
+                    <option value="slow">slow (1.5 s, past the provider's wait)</option>
+                    <option value="denied">refused (403)</option>
+                    <option value="offline">offline (fetch rejects)</option>
+                    <option value="none">no organisation URL (canvas, the demo)</option>
+                </select>
+            </label>
+
             <button type="button" id="harness-order">Put an order in the column</button>
             <button type="button" id="harness-fetchxml">Put FetchXML in the column</button>
+            <button type="button" id="harness-fetchxml-faults">Put FetchXML with faults in the column</button>
             <button type="button" id="harness-break">Put a fault in the column</button>
 
             <button type="button" id="harness-empty">Clear the column</button>
@@ -241,6 +254,9 @@
 
         <p class="harness-note" id="harness-status"></p>
 
+        <!-- The template rig's fixture and host: they answer the /api/data reads. -->
+        <script src="fixture.js"></script>
+        <script src="host.js"></script>
         <script src="harness.js"></script>
         <script src="../out/controls/CodeEditor/bundle.js"></script>
         <script>

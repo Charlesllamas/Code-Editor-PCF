@@ -102,6 +102,9 @@
     var realFetch = window.fetch.bind(window);
     window.fetch = function (url, init) {
         var path = String(url);
+        if (path.indexOf('/api/data/v9.2/') !== -1) {
+            return metadataReply(path, init);
+        }
         if (path.indexOf('/WebResources/') === -1) {
             return realFetch(url, init);
         }
@@ -118,6 +121,32 @@
             }, 150);
         });
     };
+
+    /*
+     * The table definitions FetchXML completes from (1.5.0), answered by the
+     * template rig's fetch stub (dev/host.js) from dev/fixture.js — the shapes
+     * the 1.4.9 probe measured on a form. Each state of the switch hands the
+     * control its own organisation URL (`/rig-<state>`), because the control
+     * keeps one reader per URL for the page's life: a refusal stays refused,
+     * as it would on a form, and a fresh state gets a fresh reader.
+     */
+    var rigContexts = {};
+
+    function metadataReply(path, init) {
+        var mode = (path.match(/\/rig-(\w+)\//) || [])[1] || 'ready';
+        if (mode === 'offline') {
+            return Promise.reject(new TypeError('Failed to fetch'));
+        }
+        var status = mode === 'denied' ? 403 : 200;
+        var origin = 'https://rig-' + status + '.crm.invalid';
+        if (!rigContexts[origin]) {
+            rigContexts[origin] = window.__pcfHost.createContext({ fixture: window.__pcfFixture, clientUrl: origin, metadataStatus: status });
+        }
+        var answer = window.__pcfHostFetch(origin + path.slice(path.indexOf('/api/data/v9.2/')), init);
+        return mode === 'slow'
+            ? new Promise(function (resolve) { window.setTimeout(function () { resolve(answer); }, 1500); })
+            : answer;
+    }
 
     /**
      * `parameter.security`, and the shape matters.
@@ -172,6 +201,7 @@
             fitContent: document.getElementById('harness-fit').checked,
             validation: document.getElementById('harness-validation').value,
             schema: document.getElementById('harness-schema').value,
+            metadata: document.getElementById('harness-metadata').value,
         };
     }
 
@@ -196,7 +226,9 @@
              * field control's typings. The page's own origin, so the control's
              * web-resource fetch lands on the stub above.
              */
-            page: { getClientUrl: function () { return location.origin; } },
+            page: o.metadata === 'none'
+                ? undefined
+                : { getClientUrl: function () { return location.origin + '/rig-' + o.metadata; } },
 
             /*
              * Withheld unless the app publishes one. A canvas app and the
@@ -334,6 +366,9 @@
 
         instance.init(context, notifyOutputChanged, {}, container);
         instance.updateView(context);
+        // For driving the editor from the console or a script — a hidden pane
+        // takes no keystrokes. Debugging only; nothing in the control reads it.
+        window.__harnessInstance = instance;
 
         showOutputs();
     }
@@ -365,6 +400,7 @@
             'harness-fit',
             'harness-validation',
             'harness-schema',
+            'harness-metadata',
         ].forEach(function (id) {
             document.getElementById(id).addEventListener('change', mount);
         });
@@ -389,6 +425,25 @@
         // out one element per line and leave the comment where it was.
         document.getElementById('harness-fetchxml').addEventListener('click', function () {
             columnValue = '<fetch top="5"><entity name="account"><attribute name="name"/><filter type="and"><condition attribute="statecode" operator="eq" value="0"/></filter><!-- recent first --><order attribute="createdon" descending="true"/></entity></fetch>';
+            mount();
+        });
+
+        // FetchXML with one fault the server refuses and two it would only
+        // warn about (SPEC.md, the 1.4.9 probe, P2): the strip names the
+        // error, and the warnings are marked without counting.
+        document.getElementById('harness-fetchxml-faults').addEventListener('click', function () {
+            columnValue = [
+                '<fetch top="5">',
+                '  <entity name="account">',
+                '    <attribute name="name" />',
+                '    <attribute name="nmae" />',
+                '    <atribute name="accountnumber" />',
+                '    <filter type="and">',
+                '      <condition attribute="industrycode" operator="eq" value="99" />',
+                '    </filter>',
+                '  </entity>',
+                '</fetch>',
+            ].join('\n');
             mount();
         });
 

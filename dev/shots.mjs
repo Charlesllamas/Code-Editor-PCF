@@ -34,6 +34,10 @@ const SHOTS = {
     // both in the node under <body>, so the crop leaves them room.
     completion: { file: 'screenshot-completion.png', height: 280 }, // Monaco fits the list to the window: less, and it flips above the caret
     hover: { file: 'screenshot-hover.png', height: 225 },
+    // 1.5.0: account's columns with their display names, from the rig's
+    // table definitions; and an error beside two warnings.
+    'fetchxml-completion': { file: 'screenshot-fetchxml.png', height: 300 },
+    'fetchxml-faults': { file: 'screenshot-fetchxml-faults.png', height: 244 },
 };
 
 const BROWSERS = [

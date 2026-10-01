@@ -1,13 +1,16 @@
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import monaco, { resolveLanguage } from "./monacoSetup";
-import { displayName } from "./languages";
-import { hasValidator, Problem, validateJson, validateXml } from "./validate";
+import { displayName, isXmlFamily } from "./languages";
+import { hasValidator, isError, Problem, validateJson, validateXml } from "./validate";
 import { resolveHeight, resolveWidth, STATUS_BAR_HEIGHT } from "./sizing";
 import { MonacoTheme, pageTheme, ThemeVote } from "./theme";
 import { resolveSchemaSource } from "./schema";
 import { fromText, loadWebResourceSchema, SchemaStatus, schemaStatusText, schemaWithholdsVerdict } from "./schemaLoader";
 import { schemaRegistry } from "./schemaRegistry";
 import { lineVisible, visibleArea } from "./clip";
+import { fetchValidate } from "./fetchValidate";
+import { fetchRegistry } from "./fetchRegistry";
+import { Metadata, Need, metadataFor } from "./metadata";
 import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from "./overflow";
 // THROWAWAY: the 1.4.9 probe (SPEC.md P1–P7). Remove with probe.ts before 1.5.0.
 import * as probe from "./probe";
@@ -63,6 +66,17 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private _stopWatchingScroll: (() => void) | undefined;
     /** The model URI this control filed a schema under, if it did. */
     private _registeredUri: string | undefined;
+    /** The model URI this control filed a FetchXML entry under, if it did. */
+    private _fetchUri: string | undefined;
+    /**
+     * The page's reader of this environment's table definitions, or null
+     * where no request can be made: no organisation URL — canvas, the demo.
+     */
+    private _metadata: Metadata | null = null;
+    /** A FetchXML check is waiting on metadata; one wait at a time. */
+    private _awaitingMetadata = false;
+    /** Whether the last check found the document not well-formed. */
+    private _syntaxFault = false;
     private _fitContent = false;
     private _readOnly = false;
     private _suppressChange = false;
@@ -109,6 +123,12 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
 
         this._code = context.parameters.code.raw ?? null;
         this._language = resolveLanguage(context.parameters.language.raw);
+
+        // Decided once per mount: the organisation URL does not change between
+        // passes, and every editor on the page shares the reader (metadata.ts).
+        const url = clientUrl(context);
+        const languageId = context.userSettings?.languageId;
+        this._metadata = url ? metadataFor(url, typeof languageId === "number" ? languageId : null, (u, init) => fetch(u, init)) : null;
 
         // The list and every hover render under <body>, where no form
         // container can cut them or move their origin (overflow.ts).
@@ -236,6 +256,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._stopWatchingScroll?.();
         this._stopWatchingScroll = undefined;
         this.unregisterSchema();
+        this.unregisterFetch();
         const model = this._editor?.getModel();
         if (model) {
             monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
@@ -355,6 +376,52 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._registeredUri = uri;
     }
 
+    /**
+     * File this editor for FetchXML completion and hover (fetchRegistry.ts),
+     * or take it back. Unlike the JSON schema, nothing has to load and
+     * validation need not be on: the grammar is always there, and the table
+     * definitions are read when something first asks.
+     */
+    private registerFetch(): void {
+        const model = this._editor?.getModel();
+        if (!model || this._language !== "fetchxml") {
+            this.unregisterFetch();
+            return;
+        }
+        const uri = model.uri.toString();
+        if (uri === this._fetchUri) {
+            return;
+        }
+        this.unregisterFetch();
+        fetchRegistry.set(uri, {
+            metadata: this._metadata,
+            labels: {
+                required: this.text("Completion_Required"),
+                deprecated: this.text("Completion_Deprecated"),
+                relationship: this.text("Completion_Relationship"),
+                manyToMany: this.text("Completion_ManyToMany"),
+                allowedValues: this.text("Hover_AllowedValues"),
+                takes: {
+                    none: this.text("Hover_TakesNone"),
+                    one: this.text("Hover_TakesOne"),
+                    count: this.text("Hover_TakesCount"),
+                    two: this.text("Hover_TakesTwo"),
+                    many: this.text("Hover_TakesMany")
+                },
+                notReadable: this.text("Hover_NotReadable"),
+                shadowOf: this.text("Hover_ShadowOf")
+            }
+        });
+        this._fetchUri = uri;
+    }
+
+    private unregisterFetch(): void {
+        if (this._fetchUri !== undefined) {
+            fetchRegistry.delete(this._fetchUri);
+            this._fetchUri = undefined;
+        }
+    }
+
     private unregisterSchema(): void {
         if (this._registeredUri !== undefined) {
             schemaRegistry.delete(this._registeredUri);
@@ -449,7 +516,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._problems = this._validate ? this.findProblems(model.getValue()) : [];
 
         monaco.editor.setModelMarkers(model, MARKER_OWNER, this._problems.map((p) => ({
-            severity: monaco.MarkerSeverity.Error,
+            severity: isError(p) ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
             message: p.message,
             startLineNumber: p.line,
             startColumn: p.column,
@@ -460,21 +527,45 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         // Everything that can put a schema in or out of force — a language, a
         // switch, a schema landing — comes through here.
         this.registerSchema();
+        this.registerFetch();
         this.renderStatus();
 
         // The verdict is an output a canvas app can act on (a Save button's
         // DisplayMode), so it is handed over when it changes — on a keystroke,
         // a schema landing, or a switch — not only when the text does.
         // Validation off is the neutral verdict: valid, 0. A schema asked for
-        // and not in force withholds "valid" (schemaWithholdsVerdict).
+        // and not in force withholds "valid" (schemaWithholdsVerdict). A
+        // warning does not count: it is about the environment, not the
+        // document (fetchValidate.ts).
+        const errors = this._problems.filter(isError).length;
         const verdict = {
-            isValid: this._problems.length === 0 && !this.schemaWithheld(),
-            problemCount: this._problems.length
+            isValid: errors === 0 && !this.schemaWithheld(),
+            problemCount: errors
         };
         if (verdict.isValid !== this._verdict.isValid || verdict.problemCount !== this._verdict.problemCount) {
             this._verdict = verdict;
             this._notifyOutputChanged();
         }
+    }
+
+    /**
+     * Read what the FetchXML check lacked, then check again — one wait at a
+     * time, and never after destroy(). A read that fails is a settled state,
+     * so the next check asks for nothing and this ends.
+     */
+    private awaitMetadata(needs: Need[]): void {
+        const metadata = this._metadata;
+        if (!metadata || needs.length === 0 || this._awaitingMetadata) {
+            return;
+        }
+        this._awaitingMetadata = true;
+        const token = this._schemaToken;
+        void metadata.ensure(needs).then(() => {
+            this._awaitingMetadata = false;
+            if (token === this._schemaToken && this._editor?.getModel()) {
+                this.runValidate();
+            }
+        });
     }
 
     /** The schema applies to JSON with validation on; elsewhere it withholds nothing. */
@@ -483,6 +574,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     }
 
     private findProblems(text: string): Problem[] {
+        this._syntaxFault = false;
         switch (this._language) {
             case "json": {
                 // Syntax first: a schema check against half a document is noise.
@@ -493,8 +585,22 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
                 const schema = this._schema;
                 return schema.kind === "loaded" && schema.load.state === "ready" ? schema.load.validate(text) : [];
             }
-            case "xml":
-                return validateXml(text, xmlParserError);
+            case "xml": {
+                const syntax = validateXml(text, xmlParserError);
+                this._syntaxFault = syntax.length > 0;
+                return syntax;
+            }
+            case "fetchxml": {
+                // Well-formed first; FetchXML's own checks read the tree.
+                const syntax = validateXml(text, xmlParserError);
+                if (syntax.length > 0) {
+                    this._syntaxFault = true;
+                    return syntax;
+                }
+                const checked = fetchValidate(text, this._metadata);
+                this.awaitMetadata(checked.needs);
+                return checked.problems;
+            }
             default:
                 return [];
         }
@@ -521,7 +627,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._problemButton.className = "CodeEditor-problem";
         this._problemButton.hidden = true;
         this._problemButton.addEventListener("click", () => {
-            const first = this._problems[0];
+            const first = this.shownProblem();
             if (!first) {
                 return;
             }
@@ -558,7 +664,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._languageLabel.textContent = displayName(this._language);
 
         const validating = this._validate && hasValidator(this._language);
-        const first = this._problems[0];
+        const first = this.shownProblem();
 
         if (validating && first) {
             const more = this._problems.length - 1;
@@ -586,10 +692,14 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             this._okLabel.hidden = !claim;
         }
 
-        this._root.classList.toggle("CodeEditor--invalid", validating && !!first);
+        this._root.classList.toggle("CodeEditor--invalid", validating && !!first && isError(first));
+        this._problemButton.classList.toggle("CodeEditor-problem--warning", !!first && !isError(first));
 
-        // The schema applies to JSON; under another language it says nothing.
-        const schema = validating && this._language === "json" ? schemaStatusText(this._schema) : null;
+        // The schema applies to JSON, the table definitions to FetchXML; under
+        // another language the slot says nothing.
+        const schema = validating && this._language === "json"
+            ? schemaStatusText(this._schema)
+            : this._language === "fetchxml" ? metadataStatusText(this._metadata) : null;
         this._schemaLabel.hidden = schema === null;
         this._schemaLabel.textContent = schema ? this.text(schema.key, ...schema.args) : "";
         // The strip truncates; the whole sentence is one hover away.
@@ -600,12 +710,17 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         // while validation is showing a fault; with validation off it shows,
         // and a broken document is left as it is (formatXml declines).
         const canFormat = !this._readOnly
-            && (this._language === "json" || (this._language === "xml" && !(validating && first)));
+            && (this._language === "json" || (isXmlFamily(this._language) && !(validating && this._syntaxFault)));
         this._formatButton.hidden = !canFormat;
         if (canFormat) {
             this._formatButton.textContent = this.text("Status_Format");
             this._formatButton.title = this.text("Status_FormatHint");
         }
+    }
+
+    /** The problem the strip names: the first error, else the first warning. */
+    private shownProblem(): Problem | undefined {
+        return this._problems.find(isError) ?? this._problems[0];
     }
 
     private text(key: string, ...args: string[]): string {
@@ -630,6 +745,25 @@ function xmlParserError(text: string): string | null {
     const doc = new DOMParser().parseFromString(text, "application/xml");
     const error = doc.getElementsByTagName("parsererror")[0];
     return error ? (error.textContent ?? "") : null;
+}
+
+/**
+ * What the strip says about the table definitions: only a failure, and only
+ * where a read was tried — canvas and the demo make none and say nothing.
+ */
+function metadataStatusText(metadata: Metadata | null): { key: string; args: string[]; failed: boolean } | null {
+    const failure = metadata?.failure();
+    if (!failure) {
+        return null;
+    }
+    switch (failure.state) {
+        case "denied":
+            return { key: "Status_MetadataDenied", args: [], failed: true };
+        case "offline":
+            return { key: "Status_MetadataOffline", args: [], failed: true };
+        default:
+            return { key: "Status_MetadataFailed", args: [String(failure.status)], failed: true };
+    }
 }
 
 /**

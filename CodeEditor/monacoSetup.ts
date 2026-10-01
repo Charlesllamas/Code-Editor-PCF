@@ -10,6 +10,9 @@ import { formatXml } from "./formatXml";
 import { complete } from "./complete";
 import { hover } from "./hover";
 import { schemaRegistry } from "./schemaRegistry";
+import { fetchComplete, FetchKind } from "./fetchComplete";
+import { fetchHover } from "./fetchHover";
+import { fetchRegistry } from "./fetchRegistry";
 
 // Registering a language gives monaco its id, extensions and aliases, and wires
 // a lazy tokens-provider factory. Under PCF's single-chunk build that factory
@@ -77,6 +80,10 @@ const GRAMMARS: GrammarEntry[] = [
     { id: "powerquery", extensions: [".pq",".m"], aliases: ["Power Query","M"], conf: pqConf, language: pqLang },
     { id: "msdax", extensions: [".dax",".msdax"], aliases: ["DAX","MSDAX"], conf: daxConf, language: daxLang },
     { id: "xml", extensions: [".xml"], aliases: ["XML"], conf: xmlConf, language: xmlLang },
+    // 1.5.0: the same grammar under a language of its own, so the FetchXML
+    // providers below can be registered for it alone — an `xml` editor is
+    // untouched by construction, not by a check.
+    { id: "fetchxml", extensions: [], aliases: ["FetchXML"], conf: xmlConf, language: xmlLang },
     { id: "markdown", extensions: [".md"], aliases: ["Markdown"], conf: mdConf, language: mdLang },
     { id: "powershell", extensions: [".ps1"], aliases: ["PowerShell"], conf: ps1Conf, language: ps1Lang },
     { id: "csharp", extensions: [".cs"], aliases: ["C#"], conf: csConf, language: csLang },
@@ -138,23 +145,25 @@ monaco.languages.registerDocumentFormattingEditProvider("json", {
     }
 });
 
-// Format Document for XML, through formatXml.ts: re-indentation of element-
-// only content, anything holding text written back as it was. A document it
-// cannot read comes back null and the command changes nothing.
-monaco.languages.registerDocumentFormattingEditProvider("xml", {
-    provideDocumentFormattingEdits(model, options) {
-        const text = model.getValue();
-        const formatted = formatXml(text, {
-            tabSize: options.tabSize,
-            insertSpaces: options.insertSpaces,
-            eol: model.getEOL()
-        });
-        if (formatted === null || formatted === text) {
-            return [];
+// Format Document for XML and FetchXML, through formatXml.ts: re-indentation
+// of element-only content, anything holding text written back as it was. A
+// document it cannot read comes back null and the command changes nothing.
+for (const id of ["xml", "fetchxml"]) {
+    monaco.languages.registerDocumentFormattingEditProvider(id, {
+        provideDocumentFormattingEdits(model, options) {
+            const text = model.getValue();
+            const formatted = formatXml(text, {
+                tabSize: options.tabSize,
+                insertSpaces: options.insertSpaces,
+                eol: model.getEOL()
+            });
+            if (formatted === null || formatted === text) {
+                return [];
+            }
+            return [{ range: model.getFullModelRange(), text: formatted }];
         }
-        return [{ range: model.getFullModelRange(), text: formatted }];
-    }
-});
+    });
+}
 
 // Completion and hover for JSON, from the schema in force. Registered once for
 // the page, like everything above: a provider belongs to a language, not to
@@ -213,6 +222,91 @@ monaco.languages.registerHoverProvider("json", {
             return null;
         }
         const answer = hover(model.getValue(), model.getOffsetAt(position), entry.schema, entry.labels);
+        return answer
+            ? { range: rangeOf(model, answer.offset, answer.offset + answer.length), contents: [markdown(answer.markdown)] }
+            : null;
+    }
+});
+
+// Completion and hover for FetchXML (1.5.0): the grammar, and the
+// environment's tables, columns, joins and choice values where the control
+// could read its table definitions (fetchRegistry.ts holds whether it can).
+//
+// The decisions are synchronous and say what metadata they lacked; these
+// providers fetch that and ask again, waiting up to METADATA_WAIT_MS — the
+// slowest cold read on the form was 311 ms (SPEC.md, the 1.4.9 probe) — and
+// answering with what they have after that, marked incomplete so Monaco asks
+// again on the next keystroke.
+const METADATA_WAIT_MS = 1000;
+
+const FETCH_KINDS: Record<FetchKind, monaco.languages.CompletionItemKind> = {
+    element: monaco.languages.CompletionItemKind.Module,
+    attribute: monaco.languages.CompletionItemKind.Property,
+    value: monaco.languages.CompletionItemKind.Value,
+    table: monaco.languages.CompletionItemKind.Class,
+    column: monaco.languages.CompletionItemKind.Field,
+    operator: monaco.languages.CompletionItemKind.Operator,
+    relationship: monaco.languages.CompletionItemKind.Reference,
+    alias: monaco.languages.CompletionItemKind.Variable
+};
+
+function waitFor(promise: Promise<void>): Promise<boolean> {
+    return Promise.race([
+        promise.then(() => true),
+        new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), METADATA_WAIT_MS))
+    ]);
+}
+
+monaco.languages.registerCompletionItemProvider("fetchxml", {
+    triggerCharacters: ["<", "/", "\"", "'", " "],
+    async provideCompletionItems(model, position) {
+        const entry = fetchRegistry.get(model.uri.toString());
+        if (!entry) {
+            return { suggestions: [] };
+        }
+        const text = model.getValue();
+        const offset = model.getOffsetAt(position);
+        let found = fetchComplete(text, offset, entry.metadata, entry.labels);
+        let incomplete = false;
+        if (found.needs.length > 0 && entry.metadata) {
+            const settled = await waitFor(entry.metadata.ensure(found.needs));
+            found = fetchComplete(text, offset, entry.metadata, entry.labels);
+            incomplete = !settled || found.needs.length > 0;
+        }
+        return {
+            incomplete,
+            suggestions: found.suggestions.map((s) => ({
+                label: s.description ? { label: s.label, description: s.description } : s.label,
+                kind: FETCH_KINDS[s.kind],
+                insertText: s.insertText,
+                insertTextRules: s.snippet ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
+                filterText: s.filterText,
+                detail: s.detail,
+                documentation: s.documentation ? markdown(s.documentation) : undefined,
+                sortText: s.sortText,
+                tags: s.deprecated ? [monaco.languages.CompletionItemTag.Deprecated] : undefined,
+                // An attribute whose value has a list: open it inside the quotes.
+                command: s.retrigger ? { id: "editor.action.triggerSuggest", title: "" } : undefined,
+                range: rangeOf(model, s.start, s.end)
+            }))
+        };
+    }
+});
+
+monaco.languages.registerHoverProvider("fetchxml", {
+    async provideHover(model, position) {
+        const entry = fetchRegistry.get(model.uri.toString());
+        if (!entry) {
+            return null;
+        }
+        const text = model.getValue();
+        const offset = model.getOffsetAt(position);
+        let found = fetchHover(text, offset, entry.metadata, entry.labels);
+        if (found.needs.length > 0 && entry.metadata) {
+            await waitFor(entry.metadata.ensure(found.needs));
+            found = fetchHover(text, offset, entry.metadata, entry.labels);
+        }
+        const answer = found.answer;
         return answer
             ? { range: rangeOf(model, answer.offset, answer.offset + answer.length), contents: [markdown(answer.markdown)] }
             : null;

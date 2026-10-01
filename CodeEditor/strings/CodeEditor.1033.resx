@@ -132,7 +132,7 @@
     <value>Language</value>
   </data>
   <data name="Language_Desc_Key" xml:space="preserve">
-    <value>Language Mode(json,xml,..).</value>
+    <value>Language mode: json, xml, fetchxml, sql, yaml and more.</value>
   </data>
   <data name="Theme_Display_Key" xml:space="preserve">
     <value>Theme</value>
@@ -256,5 +256,41 @@
   </data>
   <data name="Hover_Default" xml:space="preserve">
     <value>Default</value>
+  </data>
+  <data name="Completion_Relationship" xml:space="preserve">
+    <value>relationship {0}</value>
+  </data>
+  <data name="Completion_ManyToMany" xml:space="preserve">
+    <value>many-to-many, through to {0}</value>
+  </data>
+  <data name="Hover_TakesNone" xml:space="preserve">
+    <value>Takes no value.</value>
+  </data>
+  <data name="Hover_TakesOne" xml:space="preserve">
+    <value>Takes one value, in value.</value>
+  </data>
+  <data name="Hover_TakesCount" xml:space="preserve">
+    <value>Takes a number, in value.</value>
+  </data>
+  <data name="Hover_TakesTwo" xml:space="preserve">
+    <value>Takes two values, each in a value element.</value>
+  </data>
+  <data name="Hover_TakesMany" xml:space="preserve">
+    <value>Takes a list of values, each in a value element.</value>
+  </data>
+  <data name="Hover_NotReadable" xml:space="preserve">
+    <value>Not valid for read: Dataverse refuses it in a query.</value>
+  </data>
+  <data name="Hover_ShadowOf" xml:space="preserve">
+    <value>The name of {0}, kept beside it.</value>
+  </data>
+  <data name="Status_MetadataDenied" xml:space="preserve">
+    <value>No access to the table definitions — names are not checked</value>
+  </data>
+  <data name="Status_MetadataOffline" xml:space="preserve">
+    <value>The table definitions could not be read — names are not checked</value>
+  </data>
+  <data name="Status_MetadataFailed" xml:space="preserve">
+    <value>The table definitions could not be read ({0}) — names are not checked</value>
   </data>
 </root>

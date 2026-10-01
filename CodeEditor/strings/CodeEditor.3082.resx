@@ -132,7 +132,7 @@
     <value>Lenguaje</value>
   </data>
   <data name="Language_Desc_Key" xml:space="preserve">
-    <value>Lenguaje de código(json,xml,..).</value>
+    <value>Lenguaje de código: json, xml, fetchxml, sql, yaml y otros.</value>
   </data>
   <data name="Theme_Display_Key" xml:space="preserve">
     <value>Tema</value>
@@ -256,5 +256,41 @@
   </data>
   <data name="Hover_Default" xml:space="preserve">
     <value>Predeterminado</value>
+  </data>
+  <data name="Completion_Relationship" xml:space="preserve">
+    <value>relación {0}</value>
+  </data>
+  <data name="Completion_ManyToMany" xml:space="preserve">
+    <value>varios a varios, hasta {0}</value>
+  </data>
+  <data name="Hover_TakesNone" xml:space="preserve">
+    <value>No lleva valor.</value>
+  </data>
+  <data name="Hover_TakesOne" xml:space="preserve">
+    <value>Lleva un valor, en value.</value>
+  </data>
+  <data name="Hover_TakesCount" xml:space="preserve">
+    <value>Lleva un número, en value.</value>
+  </data>
+  <data name="Hover_TakesTwo" xml:space="preserve">
+    <value>Lleva dos valores, cada uno en un elemento value.</value>
+  </data>
+  <data name="Hover_TakesMany" xml:space="preserve">
+    <value>Lleva una lista de valores, cada uno en un elemento value.</value>
+  </data>
+  <data name="Hover_NotReadable" xml:space="preserve">
+    <value>No es válida para lectura: Dataverse la rechaza en una consulta.</value>
+  </data>
+  <data name="Hover_ShadowOf" xml:space="preserve">
+    <value>El nombre de {0}, guardado junto a ella.</value>
+  </data>
+  <data name="Status_MetadataDenied" xml:space="preserve">
+    <value>Sin acceso a las definiciones de tabla: los nombres no se comprueban</value>
+  </data>
+  <data name="Status_MetadataOffline" xml:space="preserve">
+    <value>No se pudieron leer las definiciones de tabla: los nombres no se comprueban</value>
+  </data>
+  <data name="Status_MetadataFailed" xml:space="preserve">
+    <value>No se pudieron leer las definiciones de tabla ({0}): los nombres no se comprueban</value>
   </data>
 </root>

@@ -21,11 +21,22 @@ export interface Problem {
     /** How many characters the marker covers; at least 1. */
     length: number;
     message: string;
+    /**
+     * An error unless it says otherwise. A warning is marked and named but
+     * does not count against `isValid` or in `problemCount` — FetchXML's
+     * names the environment does not know (1.5.0).
+     */
+    severity?: "error" | "warning";
 }
 
 /** Which languages this file can validate. Anything else gets no markers. */
 export function hasValidator(language: string): boolean {
-    return language === "json" || language === "xml";
+    return language === "json" || language === "xml" || language === "fetchxml";
+}
+
+/** Whether a problem counts against the verdict. */
+export function isError(problem: Problem): boolean {
+    return problem.severity !== "warning";
 }
 
 /* ------------------------------------------------------------------ JSON */

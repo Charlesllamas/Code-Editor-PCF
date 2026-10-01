@@ -25,7 +25,12 @@ const ALIASES: Record<string, string> = {
     js: "javascript",
     ts: "typescript",
     node: "javascript",
-    ecmascript: "javascript"
+    ecmascript: "javascript",
+    // 1.5.0: FetchXML is a language of its own — the XML grammar, plus
+    // completion, hover and checks from FetchXML and the table definitions.
+    fetch: "fetchxml",
+    "fetch xml": "fetchxml",
+    "fetch-xml": "fetchxml"
 };
 
 /**
@@ -45,6 +50,7 @@ export function displayName(id: string): string {
     const names: Record<string, string> = {
         json: "JSON",
         xml: "XML",
+        fetchxml: "FetchXML",
         sql: "SQL",
         yaml: "YAML",
         powerquery: "Power Query M",
@@ -60,4 +66,9 @@ export function displayName(id: string): string {
         plaintext: "Plain text"
     };
     return names[id] ?? id;
+}
+
+/** XML and FetchXML: one grammar, one well-formedness check, one formatter. */
+export function isXmlFamily(id: string): boolean {
+    return id === "xml" || id === "fetchxml";
 }

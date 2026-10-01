@@ -111,6 +111,19 @@
     color: #f1707b;
 }
 
+/*
+ * A warning (1.5.0, FetchXML): a name the environment does not know. It is
+ * named the same way and does not count against the verdict, so it is
+ * coloured as Fluent colours a warning, not a fault.
+ */
+.CodeEditor .CodeEditor-problem.CodeEditor-problem--warning {
+    color: #bc4b09;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-problem.CodeEditor-problem--warning {
+    color: #faa06b;
+}
+
 .CodeEditor-problem::before {
     content: "\26A0\FE0E";
     margin-right: 6px;

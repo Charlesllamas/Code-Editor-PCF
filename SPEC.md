@@ -642,6 +642,40 @@ it has, marked incomplete; a form that edits one query costs about four
 requests (the list, a table's columns, its relationships, a choice's
 options) and none after.
 
+## What building 1.5.0 found
+
+- **The completion's XML reader cannot be the formatter's.** `formatXml.ts`
+  reads strictly and gives up on a broken document, which is its contract;
+  its `tagEnd` lets an unclosed quote run to the end of the text. The
+  document being typed is broken by definition, so `xmlCursor.ts` scans its
+  own way: a tag still being typed ends at the next `<`, an unclosed value at
+  the line's end (the first cut ran `name="na` on to the next line's indent),
+  and a half-typed tag adopts nothing — left open, it made every sibling
+  after it its child.
+- **Two joins to one table read alike, and a self-referencing lookup is a
+  join each way.** The harness's first link-entity list showed four rows
+  called `account`: `masterid` and `parentaccountid` are each a many-to-one
+  *and* a one-to-many on account, and the rows meant opposite things. Each
+  row now says what it inserts — `accountid = masterid` beside `masterid =
+  accountid` — as the label's description, which Monaco 0.56 draws on every
+  row (`.details-label`), where `detail` shows only on the focused one.
+  Columns carry their display name the same way.
+- **The checks prefetch what completion then has.** The FetchXML check asks
+  for the columns of every table the document names as soon as it runs, so
+  the first column list on a form is usually already read; the harness's
+  1.5-second switch showed the list arriving inside the provider's wait for
+  that reason. A read nothing prefetched (the table list) answers *No
+  suggestions* once the 1,000 ms wait is spent, and the next ask lists it at
+  once.
+- **A hidden pane takes no keystrokes.** The harness was driven through
+  Monaco's own commands on `window.__harnessInstance` — set the text, place
+  the caret, `editor.action.triggerSuggest`, `acceptSelectedSuggestion` —
+  and read back from the list's DOM.
+- **The template rig answers the reads now** (`_template` `e6dc631`), and
+  this repository carries its `dev/host.js` and `dev/fixture.js`: the suite
+  drives `metadata.ts` through the stub, the harness and the shots page answer
+  `/api/data` from it, so all three agree with each other and with P1–P5.
+
 ## Not verified
 
 From the 1.4.9 probe:

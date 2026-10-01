@@ -29,6 +29,9 @@
 <body>
     <div id="root"></div>
 
+    <!-- The template rig's fixture and host: they answer the /api/data reads (1.5.0). -->
+    <script src="fixture.js"></script>
+    <script src="host.js"></script>
     <script>
         (function () {
             'use strict';
@@ -78,6 +81,10 @@
             var FAULTS = '{\n  "publisher": "PCFHub",\n  "controls": [\n    { "name": "CodeEditor", "language": "json" },\n  ],\n  "notes": "a trailing comma above, and a comment below"\n  // not JSON\n}';
 
             var XML = '<solution name="CodeEditor">\n  <control language="xml" theme="auto">\n    <property name="height">320</property>\n  </control>\n</solution>';
+            // 1.5.0: a query being written, and one with a fault the server
+            // refuses beside two it would only warn about (SPEC.md, P2).
+            var FETCH = '<fetch top="5">\n  <entity name="account">\n    <attribute name="name" />\n    <attribute name="" />\n  </entity>\n</fetch>';
+            var FETCH_FAULTS = '<fetch top="5">\n  <entity name="account">\n    <attribute name="name" />\n    <attribute name="nmae" />\n    <atribute name="accountnumber" />\n    <filter type="and">\n      <condition attribute="industrycode" operator="eq" value="99" />\n    </filter>\n  </entity>\n</fetch>';
 
             /* Each state: the column, the inputs, and the app theme. */
             var STATES = {
@@ -86,7 +93,9 @@
                 xml: { code: XML, language: 'xml', theme: 'auto', height: 400, fit: true, dark: false },
                 schema: { code: ORDER, language: 'json', theme: 'auto', height: 250, fit: false, dark: false, schema: 'new_/schemas/order.json' },
                 completion: { code: '{\n  \n}', language: 'json', theme: 'auto', height: 120, fit: false, dark: false, schema: ORDER_SCHEMA, after: openList(2, 3) },
-                hover: { code: '\n\n\n{\n  "id": 7,\n  "status": "open",\n  "lines": []\n}', language: 'json', theme: 'auto', height: 200, fit: false, dark: false, schema: ORDER_SCHEMA, after: openHover(6, 5) }
+                hover: { code: '\n\n\n{\n  "id": 7,\n  "status": "open",\n  "lines": []\n}', language: 'json', theme: 'auto', height: 200, fit: false, dark: false, schema: ORDER_SCHEMA, after: openHover(6, 5) },
+                'fetchxml-completion': { code: FETCH, language: 'fetchxml', theme: 'auto', height: 150, fit: false, dark: false, after: openList(4, 22) },
+                'fetchxml-faults': { code: FETCH_FAULTS, language: 'fetchxml', theme: 'auto', height: 400, fit: true, dark: false }
             };
 
             var state = STATES[new URLSearchParams(location.search).get('state') || 'faults'];
@@ -97,9 +106,16 @@
              * time budget is spent rendering rather than waiting.
              */
             var realFetch = window.fetch.bind(window);
+            var rig = null;
             window.fetch = function (url, init) {
-                if (String(url).indexOf('/WebResources/') !== -1) {
+                var path = String(url);
+                if (path.indexOf('/WebResources/') !== -1) {
                     return Promise.resolve(new Response(ORDER_SCHEMA, { status: 200, headers: { 'content-type': 'text/jscript' } }));
+                }
+                // The table definitions, from the template rig (dev/host.js).
+                if (path.indexOf('/api/data/v9.2/') !== -1) {
+                    rig = rig || window.__pcfHost.createContext({ fixture: window.__pcfFixture, clientUrl: 'https://rig.crm.invalid' });
+                    return window.__pcfHostFetch('https://rig.crm.invalid' + path.slice(path.indexOf('/api/data/v9.2/')), init);
                 }
                 return realFetch(url, init);
             };

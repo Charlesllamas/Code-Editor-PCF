@@ -658,9 +658,282 @@ schemaRegistry.delete('inmemory://model/1');
 schemaRegistry.delete('inmemory://model/2');
 check('destroy leaves nothing behind', [schemaRegistry.size, schemaRegistry.get('inmemory://model/1')], [0, undefined]);
 
+/* ============================================================ FetchXML (1.5.0) */
+
+/*
+ * FetchXML completion, hover and checks — pure modules, driven here with a
+ * snapshot built by hand, and metadata.ts driven through the template rig's
+ * fetch stub (dev/host.js), which answers the table-definition reads in the
+ * shapes the 1.4.9 probe measured on the form (SPEC.md P1–P5).
+ */
+
+const { scanXml, placeAt } = load('xmlCursor');
+const { ELEMENTS, OPERATORS, operatorOf } = load('fetchGrammar');
+const { fetchComplete } = load('fetchComplete');
+const { fetchHover } = load('fetchHover');
+const { fetchValidate } = load('fetchValidate');
+const { fetchRegistry } = load('fetchRegistry');
+const { metadataFor, forgetMetadata } = load('metadata');
+const { isError } = load('validate');
+const rigHost = require('./host');
+const rigFixture = require('./fixture');
+
+/** `|` marks the caret. */
+function caretAt(src) {
+    const offset = src.indexOf('|');
+    return { text: src.slice(0, offset) + src.slice(offset + 1), offset };
+}
+
+const FETCH_LABELS = {
+    required: 'required', deprecated: 'deprecated', relationship: 'relationship {0}', manyToMany: 'many-to-many, through to {0}',
+    allowedValues: 'Allowed values',
+    takes: { none: 'Takes no value.', one: 'Takes one value.', count: 'Takes a number.', two: 'Takes two values.', many: 'Takes a list.' },
+    notReadable: 'Not valid for read.', shadowOf: 'The name of {0}.'
+};
+
+const COL = (name, type, label, extra = {}) => Object.assign({ name, type, typeName: type + 'Type', label, description: null, readable: true, shadowOf: null }, extra);
+const ACCOUNT = [
+    COL('accountid', 'Uniqueidentifier', 'Account'),
+    COL('accountnumber', 'String', 'Account Number'),
+    COL('createdon', 'DateTime', 'Created On'),
+    COL('industrycode', 'Picklist', 'Industry'),
+    COL('isprivate', 'Boolean', 'Is Private', { readable: false }),
+    COL('name', 'String', 'Account Name', { description: 'Type the company name.' }),
+    COL('primarycontactid', 'Lookup', 'Primary Contact'),
+    COL('primarycontactidname', 'Virtual', null, { typeName: 'VirtualType', shadowOf: 'primarycontactid' }),
+    COL('revenue', 'Money', 'Annual Revenue'),
+    COL('statecode', 'State', 'Status')
+];
+const CONTACT = [COL('contactid', 'Uniqueidentifier', 'Contact'), COL('fullname', 'String', 'Full Name')];
+
+/** A Snapshot from plain data: absent is "never asked", a string a failure state. */
+function snapshotOf(data) {
+    const wrap = (v) => (v === undefined ? undefined : typeof v === 'string' ? { state: v, status: 404 } : { state: 'ready', value: v });
+    return {
+        tables: () => wrap(data.tables),
+        columns: (t) => wrap((data.columns || {})[t]),
+        links: (t) => wrap((data.links || {})[t]),
+        options: (t, c) => wrap((data.options || {})[t + '.' + c])
+    };
+}
+
+const FULL = snapshotOf({
+    tables: [{ name: 'account', label: 'Account', entitySet: 'accounts', primaryId: 'accountid', primaryName: 'name', intersect: false }, { name: 'contact', label: 'Contact', entitySet: 'contacts', primaryId: 'contactid', primaryName: 'fullname', intersect: false }],
+    columns: { account: ACCOUNT, contact: CONTACT, nosuchtable: 'notFound' },
+    links: { account: [
+        { kind: 'manyToOne', schemaName: 'account_primary_contact', table: 'contact', from: 'contactid', to: 'primarycontactid', intersect: false },
+        { kind: 'manyToMany', schemaName: 'cll_account_tag', table: 'cll_account_tag', from: 'accountid', to: 'accountid', intersect: true, through: 'cll_tag' }
+    ] },
+    options: { 'account.industrycode': [{ value: 1, label: 'Accounting' }, { value: 2, label: 'Agriculture' }] }
+});
+const EMPTY = snapshotOf({});
+
+const fetchAt = (src, snapshot = FULL) => {
+    const c = caretAt(src);
+    return fetchComplete(c.text, c.offset, snapshot, FETCH_LABELS);
+};
+const labelsOf = (answer) => answer.suggestions.slice().sort((a, b) => (a.sortText < b.sortText ? -1 : a.sortText > b.sortText ? 1 : 0)).map((s) => s.label);
+const ENTITY = (inner) => `<fetch>\n  <entity name="account">\n    ${inner}\n  </entity>\n</fetch>`;
+
+section('xmlCursor.ts — a document half-way through being typed');
+
+{
+    const where = (src) => {
+        const c = caretAt(src);
+        const doc = scanXml(c.text);
+        const p = placeAt(doc, c.text, c.offset);
+        const name = (i) => (i >= 0 ? doc.elements[i].name : null);
+        return [p.kind, name(p.element !== undefined ? p.element : p.open), p.parent === undefined ? undefined : name(p.parent), p.start === undefined ? undefined : c.text.slice(p.start, p.end)];
+    };
+    check('a lone < under entity is an element name, with entity as its parent', where(ENTITY('<|')), ['elementName', '', 'entity', '']);
+    check("an unclosed value stops at the line's end, not at the next tag", where(ENTITY('<attribute name="na|')), ['attributeValue', 'attribute', undefined, 'na']);
+    check('between an attribute and /> a new attribute goes', where(ENTITY('<attribute name="name" |/>')), ['attributeName', 'attribute', undefined, '']);
+    check('in a close tag: the element it should close', where('<fetch><entity name="a"></|'), ['closeTag', 'entity', undefined, '']);
+    check('inside a comment, nowhere', where('<fetch><!-- <attri|bute --></fetch>')[0], 'none');
+    const doc = scanXml('<fetch><entity name="a"><attribute name="x" <filter></filter></entity></fetch>');
+    const filter = doc.elements.find((e) => e.name === 'filter');
+    check('a tag still being typed does not adopt the siblings after it', doc.elements[filter.parent].name, 'entity');
+    const open = scanXml('<fetch><entity name="a"><link-entity name="b"><attribute name="x"/></entity></fetch>');
+    check('an element a mismatched close cuts off ends there, unclosed', open.elements.map((e) => e.name + (e.closed ? '' : '*')), ['fetch', 'entity', 'link-entity*', 'attribute']);
+}
+
+section('fetchGrammar.ts — FetchXML as data (Learn, 2026-10-01, plus what the server said)');
+
+check('every child an element names is an element', Object.values(ELEMENTS).flatMap((e) => e.children).filter((c) => !ELEMENTS[c]), []);
+check('every enum and boolean attribute lists its values', Object.values(ELEMENTS).flatMap((e) => e.attributes).filter((a) => (a.kind === 'enum' || a.kind === 'boolean') && !(a.values && a.values.length)).map((a) => a.name), []);
+check('no-attrs is a child of entity — the server listed it, Learn does not (P2)', ELEMENTS.entity.children.includes('no-attrs'), true);
+check('operators are unique, and neq is the deprecated one', [new Set(OPERATORS.map((o) => o.name)).size === OPERATORS.length, OPERATORS.filter((o) => o.deprecated).map((o) => o.name)], [true, ['neq']]);
+check('between takes two values, in takes a list, null none', ['between', 'in', 'null', 'last-x-days'].map((n) => operatorOf(n).arity), ['two', 'many', 'none', 'count']);
+
+section('fetchComplete.ts — elements and attributes, from the grammar');
+
+check('< under entity: its children, in the reference order', labelsOf(fetchAt(ENTITY('<|'))), ['attribute', 'all-attributes', 'no-attrs', 'order', 'filter', 'link-entity']);
+check('< at the top: fetch', labelsOf(fetchAt('<|')), ['fetch']);
+check('under a fetch that has its entity: not a second one', labelsOf(fetchAt('<fetch>\n  <entity name="account"/>\n  <|\n</fetch>')), []);
+{
+    const fresh = fetchAt(ENTITY('<|')).suggestions.find((s) => s.label === 'attribute');
+    const renamed = fetchAt(ENTITY('<attr|ibute name="name"/>')).suggestions.find((s) => s.label === 'attribute');
+    check('a new tag gets its snippet; renaming an existing one changes the name alone', [fresh.insertText, fresh.snippet, renamed.insertText, renamed.snippet], ['attribute name="$1" />', true, 'attribute', false]);
+}
+{
+    const attrs = fetchAt(ENTITY('<attribute alias="a" |/>'));
+    const name = attrs.suggestions.find((s) => s.label === 'name');
+    check('attribute names: required first, the ones present left out', labelsOf(attrs).slice(0, 3), ['name', 'aggregate', 'groupby']);
+    check('…and taking one opens the list inside its quotes', [name.insertText, name.detail, name.retrigger, attrs.suggestions.some((s) => s.label === 'alias')], ['name="$1"', 'required', true, false]);
+}
+check('a closing tag: the element still open', fetchAt('<fetch><entity name="account"></|').suggestions.map((s) => s.insertText), ['entity>']);
+check('an unknown element offers no attributes', fetchAt(ENTITY('<nosuch |/>')).suggestions, []);
+
+section('fetchComplete.ts — names from the table definitions');
+
+{
+    const cold = fetchAt(ENTITY('<attribute name="|"/>'), EMPTY);
+    check('columns not read yet: nothing offered, and the columns asked for', [cold.suggestions.length, cold.needs], [0, [{ kind: 'columns', table: 'account' }]]);
+    const warm = fetchAt(ENTITY('<attribute name="|"/>'));
+    const name = warm.suggestions.find((s) => s.label === 'name');
+    check("read: the table's columns, without the shadow or the one not valid for read (P2)", [warm.needs, warm.suggestions.some((s) => s.label === 'primarycontactidname'), warm.suggestions.some((s) => s.label === 'isprivate'), warm.suggestions.length], [[], false, false, 8]);
+    check('…with the display name to read and to filter by', [name.detail, name.filterText, name.insertText], ['Account Name · String', 'name Account Name', 'name']);
+    check('no reader at all (canvas, the demo): no list and nothing asked', fetchAt(ENTITY('<attribute name="|"/>'), null), { suggestions: [], needs: [] });
+}
+check('inside a link-entity: the linked table\'s columns', labelsOf(fetchAt(ENTITY('<link-entity name="contact">\n      <attribute name="|"/>\n    </link-entity>'))), ['contactid', 'fullname']);
+check('from is the linked table\'s, to the table it links from', [labelsOf(fetchAt(ENTITY('<link-entity name="contact" from="|"/>'))), labelsOf(fetchAt(ENTITY('<link-entity name="contact" from="contactid" to="|"/>'))).length], [['contactid', 'fullname'], 8]);
+check('a condition with entityname: the aliased link-entity\'s table', labelsOf(fetchAt(ENTITY('<link-entity name="contact" alias="c"/>\n    <filter><condition entityname="c" attribute="|"/></filter>'))), ['contactid', 'fullname']);
+check('entityname offers the link-entities by alias, else by name', labelsOf(fetchAt(ENTITY('<link-entity name="contact" alias="c"/><link-entity name="lead"/>\n    <filter><condition entityname="|"/></filter>'))), ['c', 'lead']);
+{
+    const closed = fetchAt(ENTITY('<link-entity name="|">\n    </link-entity>'));
+    const join = closed.suggestions.find((s) => s.kind === 'relationship' && s.label === 'contact');
+    const m2m = closed.suggestions.find((s) => s.kind === 'relationship' && s.label === 'cll_account_tag');
+    check('a link-entity name: the joins first, each filling from and to inside the quotes already typed', [labelsOf(closed)[0], join.insertText, join.detail], ['cll_account_tag', 'contact" from="contactid" to="primarycontactid', 'relationship account_primary_contact']);
+    check('…a many-to-many goes through its intersect table', [m2m.insertText, m2m.detail], ['cll_account_tag" from="accountid" to="accountid" intersect="true', 'many-to-many, through to cll_tag']);
+    const open = fetchAt(ENTITY('<link-entity name="|'));
+    check('…and closes the quote itself when it was not typed', open.suggestions.find((s) => s.label === 'contact' && s.kind === 'relationship').insertText, 'contact" from="contactid" to="primarycontactid"');
+    check('…but where from or to is already there, the name alone', fetchAt(ENTITY('<link-entity name="|" from="contactid"/>')).suggestions.filter((s) => s.kind === 'relationship').map((s) => s.insertText), ['contact', 'cll_account_tag']);
+    check('…and the plain tables after the joins', closed.suggestions.filter((s) => s.kind === 'table').map((s) => s.label), ['account', 'contact']);
+}
+check('the table list not read yet is asked for', fetchAt('<fetch><entity name="|"/></fetch>', EMPTY).needs, [{ kind: 'tables' }]);
+{
+    const rank = (column, op) => fetchAt(ENTITY(`<filter><condition attribute="${column}" operator="|"/></filter>`)).suggestions.find((s) => s.label === op).sortText[0];
+    check('operators ranked by the column\'s type, never filtered out', [rank('createdon', 'last-x-days'), rank('createdon', 'like'), rank('name', 'like'), rank('name', 'neq')], ['0', '1', '0', '2']);
+}
+{
+    const cold = fetchAt(ENTITY('<filter><condition attribute="industrycode" operator="eq" value="|"/></filter>'), snapshotOf({ columns: { account: ACCOUNT } }));
+    check("a choice's value: its options asked for", cold.needs, [{ kind: 'options', table: 'account', column: 'industrycode' }]);
+    const warm = fetchAt(ENTITY('<filter><condition attribute="industrycode" operator="eq" value="|"/></filter>'));
+    check('…then offered by label, inserting the number', warm.suggestions.map((s) => [s.label, s.insertText]), [['Accounting', '1'], ['Agriculture', '2']]);
+    check('…in a <value> as well', fetchAt(ENTITY('<filter><condition attribute="industrycode" operator="in"><value>|</value></condition></filter>')).suggestions.map((s) => s.insertText), ['1', '2']);
+    check('a column that is not a choice offers no values', fetchAt(ENTITY('<filter><condition attribute="name" operator="eq" value="|"/></filter>')).suggestions, []);
+}
+
+section('fetchHover.ts — what a name means');
+
+{
+    const hoverAt = (src, snapshot = FULL) => {
+        const c = caretAt(src);
+        return fetchHover(c.text, c.offset, snapshot, FETCH_LABELS);
+    };
+    check('an element: its description', hoverAt(ENTITY('<link-en|tity name="contact"/>')).answer.markdown, ELEMENTS['link-entity'].description);
+    check('an operator: what it does and what it takes', hoverAt(ENTITY('<filter><condition attribute="createdon" operator="last-x-d|ays" value="7"/></filter>')).answer.markdown.split('\n\n').slice(0, 2), ['In the last x days\\.', 'Takes a number\\.']);
+    check('a column: its display name, where it lives and its type', hoverAt(ENTITY('<attribute name="na|me"/>')).answer.markdown.split('\n\n').slice(0, 3), ['**Account Name** `account.name`', '`String`', 'Type the company name\\.']);
+    check('a shadow column says whose name it is', hoverAt(ENTITY('<attribute name="primarycontactid|name"/>')).answer.markdown.includes('The name of primarycontactid\\.'), true);
+    check('columns not read yet: no hover, and the columns asked for', hoverAt(ENTITY('<attribute name="na|me"/>'), EMPTY), { answer: null, needs: [{ kind: 'columns', table: 'account' }] });
+    check("a choice's number: its label", hoverAt(ENTITY('<filter><condition attribute="industrycode" operator="eq" value="|1"/></filter>')).answer.markdown, '**Accounting** `1`');
+}
+
+section('fetchValidate.ts — errors where the server refuses, warnings for the rest (P2)');
+
+{
+    const problems = (src, snapshot = FULL) => fetchValidate(src, snapshot).problems.map((p) => [p.severity, p.message]);
+    check('a clean query: nothing', problems(ENTITY('<attribute name="name"/>\n    <filter type="and"><condition attribute="createdon" operator="last-x-days" value="7"/></filter>')), []);
+    check('an element FetchXML does not have is an error — the server refuses it (0x8004111c)', problems(ENTITY('<atribute name="name"/>')), [['error', '<atribute> is not a FetchXML element — <entity> takes <attribute>, <all-attributes>, <no-attrs>, <order>, <filter>, <link-entity>']]);
+    check('so is an element its parent does not take', problems(ENTITY('<condition attribute="name" operator="null"/>'))[0][0], 'error');
+    check('and an operator the server does not know (0x80041120)', problems(ENTITY('<filter><condition attribute="name" operator="equals" value="x"/></filter>')), [['error', 'Unknown operator "equals"']]);
+    check('an attribute FetchXML does not have is a warning — the server runs it', problems('<fetch nosuch="1"><entity name="account"><attribute name="name"/></entity></fetch>'), [['warning', '<fetch> has no "nosuch" attribute — Dataverse ignores it']]);
+    check('Advanced Find\'s own attributes are not warned about', problems('<fetch version="1.0" output-format="xml-platform" mapping="logical"><entity name="account"><attribute name="name"/></entity></fetch>'), []);
+    check('a value outside a fixed list, a missing name and a second entity: warnings', problems('<fetch><entity name="account"><link-entity name="contact" link-type="innr"/></entity><entity/></fetch>').map((p) => p[0]), ['warning', 'warning', 'warning']);
+    check('a column the table does not have: a warning naming both', problems(ENTITY('<attribute name="nmae"/>')), [['warning', 'account has no column "nmae"']]);
+    check('a shadow is a name the server takes: no warning; one not valid for read: a warning', problems(ENTITY('<attribute name="primarycontactidname"/><attribute name="isprivate"/>')), [['warning', 'account.isprivate is not valid for read — Dataverse refuses it']]);
+    check('a table the environment does not have: a warning', problems('<fetch><entity name="nosuchtable"/></fetch>'), [['warning', 'There is no table "nosuchtable" in this environment']]);
+    check("a value that is not one of the choice's options: a warning", problems(ENTITY('<filter><condition attribute="industrycode" operator="in"><value>1</value><value>99</value></condition></filter>')), [['warning', '99 is not an option of account.industrycode']]);
+    check('an entityname that names no link-entity: a warning', problems(ENTITY('<filter><condition entityname="zz" attribute="name" operator="null"/></filter>')).map((p) => p[1]), ['No link-entity is named or aliased "zz"']);
+    check('metadata not read yet: names unchecked, and the columns asked for', fetchValidate(ENTITY('<attribute name="nmae"/>'), EMPTY), { problems: [], needs: [{ kind: 'columns', table: 'account' }] });
+    check('warnings never count against the verdict', fetchValidate(ENTITY('<attribute name="nmae"/>'), FULL).problems.filter(isError).length, 0);
+}
+
+section('fetchRegistry.ts — one entry per editor');
+
+fetchRegistry.set('inmemory://model/7', { metadata: null, labels: FETCH_LABELS });
+check('filed and taken back', [fetchRegistry.get('inmemory://model/7').metadata, (fetchRegistry.delete('inmemory://model/7'), fetchRegistry.size)], [null, 0]);
+
+{
+    // Every key index.ts can ask for, read off the source, in both languages.
+    const source = require('fs').readFileSync(path.join(root, 'CodeEditor', 'index.ts'), 'utf8');
+    const keys = [...new Set([...source.matchAll(/this\.text\("([A-Za-z_]+)"/g), ...source.matchAll(/key: "([A-Za-z_]+)"/g)].map((m) => m[1]))];
+    const resx = (lcid) => require('fs').readFileSync(path.join(root, 'CodeEditor', 'strings', 'CodeEditor.' + lcid + '.resx'), 'utf8');
+    check('every key index.ts asks for is in both languages (' + keys.length + ')', ['1033', '3082'].map((l) => keys.filter((k) => !resx(l).includes('name="' + k + '"'))), [[], []]);
+}
+
+/*
+ * metadata.ts against the rig — the reads in the measured shapes, the cache,
+ * and the failures as states.
+ */
+async function metadataChecks() {
+    section('metadata.ts — the table definitions, through the rig (P1–P5)');
+
+    forgetMetadata();
+    const ctx = rigHost.createContext({ fixture: rigFixture, clientUrl: rigHost.nextClientUrl() });
+    const url = ctx.page.getClientUrl();
+    const asked = [];
+    const counted = (u, init) => {
+        asked.push(u);
+        return fetch(u, init);
+    };
+    const md = metadataFor(url, 1033, counted);
+    check('one reader per organisation and language, shared by every editor', metadataFor(url + '/', 1033, counted) === md, true);
+
+    await Promise.all([md.ensure([{ kind: 'tables' }]), md.ensure([{ kind: 'tables' }])]);
+    const tables = md.tables();
+    check('the table list: read once however many ask, with LabelLanguages', [asked.length, /LabelLanguages=1033$/.test(asked[0]), /\$filter=IsPrivate eq false/.test(asked[0])], [1, true, true]);
+    check('…every non-private table, its label, the intersect flagged', [tables.state, tables.value.map((t) => t.name), tables.value[0].label, tables.value.find((t) => t.name === 'cll_account_tag').intersect], ['ready', ['account', 'cll_account_tag', 'cll_tag', 'contact'], 'Account', true]);
+
+    await md.ensure([{ kind: 'columns', table: 'account' }]);
+    const cols = md.columns('account').value;
+    const col = (n) => cols.find((c) => c.name === n);
+    check("a table's columns: the shadow, the unreadable one and the multi-select as measured", [col('primarycontactidname').shadowOf, col('primarycontactidname').label, col('isprivate').readable, col('cll_classification').typeName], ['primarycontactid', null, false, 'MultiSelectPicklistType']);
+
+    await md.ensure([{ kind: 'links', table: 'account' }]);
+    const links = md.links('account').value;
+    const link = (kind, table) => links.find((l) => l.kind === kind && l.table === table);
+    check('a lookup on the table: link to what it points at, from its key to the lookup', [link('manyToOne', 'contact').from, link('manyToOne', 'contact').to], ['contactid', 'primarycontactid']);
+    check('a lookup pointing at the table: link to its rows, from the lookup to the key', [link('oneToMany', 'account').from, link('oneToMany', 'account').to], ['parentaccountid', 'accountid']);
+    check('a many-to-many: through the intersect table, from its column to the key', [link('manyToMany', 'cll_account_tag').from, link('manyToMany', 'cll_account_tag').to, link('manyToMany', 'cll_account_tag').through], ['accountid', 'accountid', 'cll_tag']);
+
+    await md.ensure([{ kind: 'options', table: 'account', column: 'industrycode' }, { kind: 'options', table: 'account', column: 'donotemail' }, { kind: 'options', table: 'account', column: 'statecode' }]);
+    check("a choice's options through its cast; a Yes/No's true option first", [md.options('account', 'industrycode').value.length, md.options('account', 'donotemail').value, md.options('account', 'statecode').value[1]], [3, [{ value: 1, label: 'Do Not Allow' }, { value: 0, label: 'Allow' }], { value: 1, label: 'Inactive' }]);
+
+    await md.ensure([{ kind: 'columns', table: 'nosuchtable' }]);
+    check('a table that is not there is an answer, not a failure', [md.columns('nosuchtable').state, md.failure()], ['notFound', null]);
+
+    const end = fetchAt(ENTITY('<attribute name="|"/>'), md);
+    check('completion reads the reader as its snapshot', end.suggestions.some((s) => s.label === 'name') && end.needs.length === 0, true);
+
+    const refusedCtx = rigHost.createContext({ fixture: rigFixture, clientUrl: rigHost.nextClientUrl(), metadataStatus: 403 });
+    const refusedAsked = [];
+    const refused = metadataFor(refusedCtx.page.getClientUrl(), 1033, (u, init) => { refusedAsked.push(u); return fetch(u, init); });
+    await refused.ensure([{ kind: 'tables' }]);
+    await refused.ensure([{ kind: 'tables' }]);
+    check('a refusal is kept as a state and never asked again', [refused.tables().state, refused.failure().state, refusedAsked.length], ['denied', 'denied', 1]);
+
+    const offlineCtx = rigHost.createContext({ fixture: rigFixture, clientUrl: rigHost.nextClientUrl(), metadataStatus: 0 });
+    const offline = metadataFor(offlineCtx.page.getClientUrl(), 1033, (u, init) => fetch(u, init));
+    await offline.ensure([{ kind: 'columns', table: 'account' }]);
+    check('offline is a state too, and what the strip names', [offline.columns('account').state, offline.failure()], ['offline', { state: 'offline' }]);
+
+    check('a canvas host has no context.page, so the control makes no reader and asks nothing', rigHost.createContext({ fixture: rigFixture, host: 'canvas' }).page, undefined);
+}
+
 /* ================================================================= verdict */
 
-loaderChecks().then(verdict, (error) => {
+loaderChecks().then(metadataChecks).then(verdict, (error) => {
     check('the asynchronous checks ran to the end', String(error && error.stack || error), '');
     verdict();
 });
