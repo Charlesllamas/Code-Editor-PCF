@@ -710,6 +710,25 @@ Production bundle 4,365,402 bytes.
 | W11 | Not blocking: a canvas app with `language` = `fetchxml` — elements and operators complete, no `api/data` request in the Network tab, nothing in the strip. |
 | W12 | Not blocking, and only if Spanish is enabled on the environment: with the user's language set to Spanish in Personal options, the W7 faults and the strip read in Spanish (*Lín. 5, col. 6: <atribute> no es un elemento de FetchXML…*). |
 
+### Answers (cll365, Accounts form and the canvas test app, 1.5.0, 2026-10-01)
+
+**All twelve the right way; nothing cut.** W1–W7, W9 and W10 as written.
+
+- **W8 — eight requests, each once, in the order the steps asked for them**:
+  account's and contact's columns at load (134 ms, 164 ms) and the two
+  options the conditions named (`industrycode` 178 ms, `statecode` 83 ms) —
+  the check reading what the document names; the table list on the first
+  table completion, **61.0 kB transferred** for the 486 KB measured (the
+  server compresses it), 270 ms cold; the relationships on the first
+  link-entity name (84 ms); `accountcategorycode`'s options (160 ms); and
+  `systemuser`'s columns once the new link-entity named it (141 ms). Nothing
+  repeated on the second pass. The other `EntityDefinitions` rows in the
+  Network tab were the form's other controls (many-to-many, many-to-one, a
+  Kanban's `EnforceStateTransitions`) and the platform's service worker.
+- **W11 — canvas**: FetchXML's own elements and operators completed, and no
+  `api/data` request went out.
+- **W12 — Spanish**: the faults and the strip read in Spanish.
+
 ## Not verified
 
 From 1.5.0:
@@ -726,7 +745,8 @@ From the 1.4.9 probe:
 - **A user without customizer rights** reading the table definitions (P7);
   every answer above is the System Administrator's.
 - **Canvas** (P6): what `context.page` is there, and what a root-relative
-  `/api/data` request answers.
+  `/api/data` request answers. W11 showed the control makes no request there,
+  which is what the docs promise; the shape behind it is still unread.
 
 From 1.4.0:
 
