@@ -693,7 +693,7 @@ options) and none after.
 
 The 1.5.0 zip over 1.4.9 on the Accounts form; the Code Editor with
 `language` = `fetchxml` (a second one, `json` with the order schema, for W9).
-Production bundle 4,361,840 bytes.
+Production bundle 4,365,402 bytes.
 
 | # | Ask |
 |---|---|
@@ -708,6 +708,7 @@ Production bundle 4,361,840 bytes.
 | W9 | Unchanged: an `xml` editor offers nothing; the `json` editor with a schema completes as 1.4.0 did; both on one form keep their own lists. |
 | W10 | Offline in DevTools before the first completion: FetchXML's own elements still complete, and the strip says the table definitions could not be read. |
 | W11 | Not blocking: a canvas app with `language` = `fetchxml` — elements and operators complete, no `api/data` request in the Network tab, nothing in the strip. |
+| W12 | Not blocking, and only if Spanish is enabled on the environment: with the user's language set to Spanish in Personal options, the W7 faults and the strip read in Spanish (*Lín. 5, col. 6: <atribute> no es un elemento de FetchXML…*). |
 
 ## Not verified
 
