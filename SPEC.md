@@ -549,7 +549,107 @@ answers (2026-10-01) to prove the probe reads them — labels, kinds, the
 refusals, the three expands, and the plain-`$expand` fallback when a nested
 `$select` is refused. That proves the probe, not the platform.
 
+### Answers (cll365, Accounts form, 1.4.9, 2026-10-01)
+
+`p.all()` after a hard reload, as System Administrator: 45 requests, every one
+a GET, no feature declared. **Nothing was cut; one answer moves a fault from
+error to warning** (P2, an unknown attribute).
+
+- **P1 — the table list reads whole, and it is half a megabyte.**
+  - `IsPrivate eq false` with `LabelLanguages=1033`: **200, 860 tables,
+    486,406 bytes, 232 ms cold**; 91 are intersect tables. Without
+    `LabelLanguages`: 573,019 bytes, 241 ms — this environment has two
+    languages provisioned (`LocalizedLabels` up to 2), so the parameter
+    saves 15%. `IsValidForAdvancedFind eq true`: 689 tables, 408,246 bytes,
+    311 ms. Names only: 77,885 bytes, 124 ms.
+  - `cache-control: no-cache` on every metadata answer, and **the warm repeat
+    was fetched again** (214 ms, same bytes): the browser keeps nothing, so a
+    page-level cache in the control is the only cache there is.
+  - So the list is read **once per page, on the first table completion, not
+    at load** — `IsPrivate eq false` with `LabelLanguages`, since FetchXML
+    joins through intersect tables the Advanced Find filter drops.
+- **P2 — a table's columns: 239 on account, 201,648 bytes, 139 ms.**
+  - By type: String 93, Virtual 41 (37 `VirtualType`, 2 multi-select, a File,
+    an Image), Picklist 20, Lookup 18, Boolean 13, Money 12, DateTime 12,
+    Integer 8, Uniqueidentifier 6, Memo 4, Double 4, Decimal 2, BigInt 2,
+    Owner, EntityName, State, Status 1 each.
+  - **71 shadows** (`AttributeOf` set — `accountcategorycodename of
+    accountcategorycode`), all `Virtual`, all with **no display name**; 120
+    are `IsLogical`; one is not valid for read (`isprivate`); 168 carry a
+    description.
+  - **FetchXML takes the shadows**: `accountcategorycodename` as an
+    `<attribute>` and in a `<condition>` both answered 200. So did the
+    composite address, `owneridtype` (EntityName), a File column and a
+    lookup. **Only the unreadable column was refused**, both ways,
+    `0x80041a08` *"Retrieve can only return columns that are valid for
+    read"* / *"cannot filter on columns that are not valid for read"*. So the
+    list offers readable columns that are not shadows; a shadow is a known
+    name (never warned about) that the list leaves out, having no label; an
+    unreadable one is a warning that says so.
+  - **The faults, as the server answers them:**
+    - an unknown column: **refused**, `0x80041103` *"'Account' entity doesn't
+      contain attribute with Name = 'nosuchcolumn'…"* — the warning stands;
+    - an unknown element (`<atribute>`): **refused**, `0x8004111c` *"Invalid
+      Child Node, valid nodes are filter, order, link-entity, attribute,
+      all-attributes, no-attrs"* — an error stands, and the message lists a
+      child (`no-attrs`) the reference pages do not;
+    - a condition directly under `<entity>`: **refused**, the same
+      `0x8004111c` — an error stands;
+    - an unknown operator (`equals`): **refused**, `0x80041120` *"Unknown
+      Condition Operator: equals"* — an error stands;
+    - **an unknown attribute (`<fetch nosuch="1">`): accepted, 200, the row
+      returned.** The server ignores an attribute it does not know. Marking
+      it an error would refuse what Dataverse runs, so **it is a warning** —
+      a typo like `alais` still silently does nothing, which is worth
+      saying, but it does not count.
+- **P3 — the three relationship kinds come in one request**: 200, 22,003
+  bytes, 102 ms — 22 many-to-one, 60 one-to-many, 5 many-to-many on
+  account. The field names are as asked (`ReferencedEntity`,
+  `ReferencedAttribute`, `ReferencingAttribute`,
+  `ReferencingEntityNavigationPropertyName`; `Entity1LogicalName`,
+  `IntersectEntityName`, `Entity1IntersectAttribute`, …), each with a
+  `MetadataId`.
+- **P4 — every cast answered with the nested `$select`**, 78–103 ms each:
+  `industrycode` 33 options in 36,495 bytes, `statecode` 2, `statuscode` 2,
+  `donotemail` 2 (through `TrueOption`/`FalseOption`), the multi-select
+  `cll_classification` 5. An option is `{ Value, Label, Color, Description,
+  IsHidden, ExternalValue, ParentValues, Tag, … }` — a State option adds
+  `DefaultStatus` and `InvariantName`, a Status option `State` and
+  `TransitionData`. The label is `Label.UserLocalizedLabel.Label`. The
+  options cannot be narrowed further (a collection of a complex type), so
+  they are read per column, on the first value completion for it.
+- **P5 — labels arrive in the user's language**: `languageId` 1033, every
+  `UserLocalizedLabel` 1033 under `LabelLanguages`. **86 of the 860 tables
+  have no label** in it (every one seen is an `adx_` intersect table) and
+  neither do the 71 shadow columns: the logical name stands in.
+- **P6 — not read yet.** In the canvas app the probe's console line appeared
+  (the control mounted) but `window.__pcfCodeEditorProbe` was undefined: a
+  canvas app runs the control in a **nested frame**, and the console
+  evaluates in the top page until its context selector is pointed at that
+  frame. Asked again with that instruction; not blocking. Beside it, on the
+  form: a **root-relative** `/api/data/v9.2/…` answered 200 as well.
+- **P7 — not run** (no second user on the environment): *Not verified*.
+- **Also: `context.utils.getEntityMetadata` throws without the feature**, on
+  this standard field control — *"Feature 'Utility.getEntityMetadata' is
+  required to be specified in the <uses-feature> section"* — as
+  `hasEntityPrivilege` did on a dataset control (pcf-row-commands, 25 Sep).
+  The Web API reads need nothing declared, which is one more reason they are
+  the route.
+
+What this sets for the build: the provider waits up to **1,000 ms** for
+metadata it lacks (the slowest cold read was 311 ms), then answers with what
+it has, marked incomplete; a form that edits one query costs about four
+requests (the list, a table's columns, its relationships, a choice's
+options) and none after.
+
 ## Not verified
+
+From the 1.4.9 probe:
+
+- **A user without customizer rights** reading the table definitions (P7);
+  every answer above is the System Administrator's.
+- **Canvas** (P6): what `context.page` is there, and what a root-relative
+  `/api/data` request answers.
 
 From 1.4.0:
 
