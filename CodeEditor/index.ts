@@ -12,8 +12,6 @@ import { fetchValidate } from "./fetchValidate";
 import { fetchRegistry } from "./fetchRegistry";
 import { Metadata, Need, metadataFor } from "./metadata";
 import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from "./overflow";
-// THROWAWAY: the 1.4.9 probe (SPEC.md P1–P7). Remove with probe.ts before 1.5.0.
-import * as probe from "./probe";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -177,14 +175,12 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this.layout(context);
         this.readSchema(context);
         this.runValidate();
-        probe.see(context); // THROWAWAY (probe)
     }
 
     /**
      * Called when any value in the property bag has changed.
      */
     public updateView(context: ComponentFramework.Context<IInputs>): void {
-        probe.see(context); // THROWAWAY (probe)
         const previouslyValidating = this._validate;
         this.readInputs(context);
         this._editor.updateOptions({ readOnly: this._readOnly });
