@@ -207,7 +207,7 @@ them as read-only labels and offers no binding.
 
 ## The bundle and the platform's size limit
 
-`bundle.js` is about 4.3 MB. Dataverse rejects a web resource larger than 5 MB
+`bundle.js` is about 4.4 MB. Dataverse rejects a web resource larger than 5 MB
 by default, so the control imports into a default environment with room to
 spare — earlier releases sat at 4.9 MB, because they carried Monaco's JSON
 language service as well, all of it dead weight behind workers that could never
