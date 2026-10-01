@@ -3,6 +3,7 @@
   "slug": "pcf-code-editor",
   "name": "Code Editor",
   "tagline": "Edit JSON, XML and other code in a multiline text column, with Monaco.",
+  "summary": "Replaces the plain text box on a multi-line text column with Monaco, the editor from VS Code, for solutions that keep JSON or XML in a column and need somebody to edit it safely.\n\n- Syntax colouring for fourteen languages, with bracket matching, folding, and find and replace\n- Strict validation for JSON, XML and FetchXML, with every fault marked and named\n- Checking, completion and hover from a JSON Schema kept as a web resource\n- FetchXML completion with your environment's own tables, columns and choices\n- **Format** for JSON, XML and FetchXML\n\nMonaco is compiled into the solution, so nothing is fetched at runtime. In a canvas app, `isValid` can gate a Save button; on a form the editor shows a fault but cannot refuse a save. The other languages are coloured, not checked.",
   "category": "text-editors",
   "hosts": [
     "canvas",
