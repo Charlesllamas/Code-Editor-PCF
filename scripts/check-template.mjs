@@ -521,6 +521,29 @@ if (exists(join(root, docsPath))) {
             `${docsPath}/changelog.md is ignored — the hub builds the changelog from release notes.`,
         );
     }
+
+    /*
+     * The migration page `npm run bump` writes is the template's, unfilled,
+     * and it says so — but only on the console of the bump. pcf-kanban-board
+     * 0.4.0's bump wrote one on a minor bump that broke nothing, `git add
+     * docs` took it into the commit, and this check passed it: tagged, the hub
+     * would have published "The breaking change, in one sentence." for 0.4.0.
+     * An unfilled page is refused here; fill it in or delete it.
+     */
+    const migration = join(root, docsPath, 'migration.md');
+
+    if (exists(migration)) {
+        const text = readFileSync(migration, 'utf8');
+        const unfilled = ['The breaking change, in one sentence.', 'The concrete step.']
+            .filter((line) => text.includes(line));
+
+        if (unfilled.length > 0) {
+            problems.push(
+                `${docsPath}/migration.md is the template's page, unfilled (${unfilled.map((line) => `"${line}"`).join(', ')}). ` +
+                    'Write what changed and what to do, or delete the page if nothing broke — the hub publishes it as it stands.',
+            );
+        }
+    }
 } else {
     problems.push(`No ${docsPath}/ directory, so this component would publish with no documentation.`);
 }
@@ -706,8 +729,10 @@ if (datasetFixture && !exists(join(root, datasetFixture))) {
      * DemoFixtureShape, mirrored: a dataset control or a grid host indexes
      * `columns` and `records`; any other control reads only the `dataverse`
      * section, a stand-in Dataverse for the calls its demo makes (pcfhub's
-     * docs/demo-harness-dataverse.md, "Field controls", 2026-09-24). The hub
-     * refuses the wrong shape at ingestion and says so only on the run.
+     * docs/demo-harness-dataverse.md, "Field controls", 2026-09-24), and the
+     * `services` list, canned answers for an external service it declares
+     * (docs/demo-harness-service-answers.md, 2026-09-29) — one or both. The
+     * hub refuses the wrong shape at ingestion and says so only on the run.
      */
     const needsRows = manifest.control?.type === 'dataset' || (manifest.demo?.host ?? 'form') === 'grid';
     let fixture = null;
@@ -722,16 +747,18 @@ if (datasetFixture && !exists(join(root, datasetFixture))) {
 
     if (fixture !== null && !isObject(fixture)) {
         problems.push(`demo.datasetFixture "${datasetFixture}" must be a JSON object.`);
+    } else if (fixture !== null && 'services' in fixture && !Array.isArray(fixture.services)) {
+        problems.push(`demo.datasetFixture "${datasetFixture}" must have services as an array of canned answers.`);
     } else if (fixture !== null && needsRows) {
         for (const key of ['columns', 'records']) {
             if (!Array.isArray(fixture[key])) {
                 problems.push(`demo.datasetFixture "${datasetFixture}" must have a ${key} array — the hub reads it as rows for this control.`);
             }
         }
-    } else if (fixture !== null && !isObject(fixture.dataverse)) {
+    } else if (fixture !== null && !isObject(fixture.dataverse) && !Array.isArray(fixture.services)) {
         problems.push(
-            `demo.datasetFixture "${datasetFixture}" must have a dataverse object — a control without a ` +
-            'dataset property reads nothing else from it.',
+            `demo.datasetFixture "${datasetFixture}" must have a dataverse object or a services array — a ` +
+            'control without a dataset property reads nothing else from it.',
         );
     }
 }

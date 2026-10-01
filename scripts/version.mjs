@@ -41,6 +41,15 @@
  *     npm run bump -- 0.6.0                 set all of them
  *     npm run bump -- --minor               bump, from the agreed current version
  *     npm run bump -- --patch --dry-run
+ *     npm run bump -- 0.0.1 --allow-lower   below the current version — only
+ *                                           for a control nothing has imported
+ *
+ * **`--allow-lower` exists for one moment in a control's life**: a new
+ * repository starts at the template's 0.1.0, and its probe builds belong
+ * *below* the release number (0.0.1, 0.0.2 …) so that 0.1.0 stays free for the
+ * first real release. Once any environment has imported a build, a lower
+ * number is an upgrade Dataverse ignores — which is why the flag is explicit
+ * rather than inferred from "no tags yet": a probe is imported untagged.
  *
  * **On PowerShell, call the script directly instead**:
  *
@@ -71,6 +80,7 @@
  * reason.
  */
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -91,6 +101,7 @@ const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 
 const argv = process.argv.slice(2);
 const dryRun = argv.includes('--dry-run');
+const allowLower = argv.includes('--allow-lower');
 
 /*
  * `--into <path>` so the template can run this against an adopted repository,
@@ -107,13 +118,13 @@ if (intoAt !== -1 && !argv[intoAt + 1]) {
 }
 
 const rest = intoAt === -1 ? argv : [...argv.slice(0, intoAt), ...argv.slice(intoAt + 2)];
-const flags = rest.filter((arg) => arg.startsWith('--') && arg !== '--dry-run');
+const flags = rest.filter((arg) => arg.startsWith('--') && arg !== '--dry-run' && arg !== '--allow-lower');
 const positional = rest.filter((arg) => !arg.startsWith('--'));
 
 const BUMPS = { '--major': 0, '--minor': 1, '--patch': 2 };
 
 if (flags.some((flag) => !(flag in BUMPS))) {
-    fail(`Unknown flag ${flags.find((flag) => !(flag in BUMPS))}. Use --major, --minor, --patch or --dry-run.`);
+    fail(`Unknown flag ${flags.find((flag) => !(flag in BUMPS))}. Use --major, --minor, --patch, --dry-run or --allow-lower.`);
 }
 
 if (flags.length > 1) {
@@ -193,10 +204,11 @@ if (agreed !== null && next === agreed) {
     fail(`Already at ${next}.`);
 }
 
-if (agreed !== null && !isAhead(next, agreed)) {
+if (agreed !== null && !isAhead(next, agreed) && !allowLower) {
     fail(
         `${next} is not ahead of ${agreed}. Dataverse compares solution versions on import, ` +
-        'and an upgrade that is not ahead does nothing.',
+        'and an upgrade that is not ahead does nothing.\n' +
+        "  For a control no environment has imported yet — a new repository's probe — pass --allow-lower.",
     );
 }
 
@@ -378,6 +390,16 @@ function isAhead(next, current) {
  * page when the number suggests it, says so, and never overwrites one that is
  * already there.
  */
+/** Whether any `v*` tag exists — i.e. whether this control has been released. */
+function hasReleaseTag() {
+    try {
+        return execFileSync('git', ['tag', '--list', 'v*'], { cwd: root, encoding: 'utf8' }).trim() !== '';
+    } catch {
+        // Not a git checkout, or no git: say nothing rather than guess.
+        return false;
+    }
+}
+
 function migrationPage() {
     const donor = join(root, 'scripts', 'templates', 'migration.md');
     const page = join(root, 'docs', 'migration.md');
@@ -402,6 +424,14 @@ function migrationPage() {
             (Number(parts[1]) === 0 && Number(parts[2]) > Number(before[2])));
 
     if (!breaking) {
+        return;
+    }
+
+    // A first release has nobody to migrate: 0.0.x probes were never tagged,
+    // and 0.0.4 → 0.1.0 is a "breaking" 0.x minor by the rule above, so
+    // pcf-input-mask's first release was handed a migration page for makers
+    // who could not exist. No release tag yet means no page.
+    if (!hasReleaseTag()) {
         return;
     }
 
