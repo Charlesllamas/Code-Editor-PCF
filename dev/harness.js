@@ -273,7 +273,8 @@
                 },
             },
 
-            userSettings: { isRTL: false, languageId: 1033 },
+            // The strings switch is the user's language, as on a form.
+            userSettings: { isRTL: false, languageId: Number(document.getElementById('harness-strings').value) || 1033 },
 
             updatedProperties: [],
         };
@@ -461,20 +462,28 @@
 
         status.textContent = 'Registered the control.';
 
-        fetch('../CodeEditor/strings/CodeEditor.1033.resx')
-            .then(function (r) { return r.text(); })
-            .then(function (xml) {
-                var doc = new DOMParser().parseFromString(xml, 'application/xml');
-                Array.prototype.forEach.call(doc.getElementsByTagName('data'), function (node) {
-                    var value = node.getElementsByTagName('value')[0];
-                    if (value) {
-                        STRINGS[node.getAttribute('name')] = value.textContent;
-                    }
-                });
-            })
-            .catch(function () {
-                status.textContent += ' Could not read the .resx; the strip shows keys.';
-            })
-            .then(mount);
+        // The platform hands the control the .resx for the user's language;
+        // the switch picks which, so the strip can be read in Spanish too.
+        var strings = document.getElementById('harness-strings');
+        function loadStrings() {
+            return fetch('../CodeEditor/strings/CodeEditor.' + strings.value + '.resx')
+                .then(function (r) { return r.text(); })
+                .then(function (xml) {
+                    Object.keys(STRINGS).forEach(function (key) { delete STRINGS[key]; });
+                    var doc = new DOMParser().parseFromString(xml, 'application/xml');
+                    Array.prototype.forEach.call(doc.getElementsByTagName('data'), function (node) {
+                        var value = node.getElementsByTagName('value')[0];
+                        if (value) {
+                            STRINGS[node.getAttribute('name')] = value.textContent;
+                        }
+                    });
+                })
+                .catch(function () {
+                    status.textContent += ' Could not read the .resx; the strip shows keys.';
+                })
+                .then(mount);
+        }
+        strings.addEventListener('change', loadStrings);
+        loadStrings();
     };
 })();

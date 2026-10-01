@@ -20,6 +20,7 @@
 
 import { compileSchema } from "./schema";
 import { Problem } from "./validate";
+import { Arg, Worded, said } from "./messages";
 
 export type SchemaLoad =
     | { state: "ready"; validate: (text: string) => Problem[]; schema: unknown }
@@ -28,7 +29,7 @@ export type SchemaLoad =
     | { state: "failed"; status: number }
     | { state: "offline" }
     | { state: "notJson" }
-    | { state: "invalidSchema"; message: string };
+    | ({ state: "invalidSchema" } & Worded);
 
 export type Fetch = (url: string, init: { credentials: "same-origin"; cache: "no-cache" }) => Promise<{
     status: number;
@@ -82,7 +83,7 @@ export function fromText(text: string): SchemaLoad {
     if (compiled.ok) {
         return { state: "ready", validate: compiled.validate, schema: compiled.schema };
     }
-    return compiled.fault === "notJson" ? { state: "notJson" } : { state: "invalidSchema", message: compiled.message };
+    return compiled.fault === "notJson" ? { state: "notJson" } : { state: "invalidSchema", message: compiled.message, key: compiled.key, args: compiled.args };
 }
 
 /* ---------------------------------------------------------------- status */
@@ -99,7 +100,7 @@ export type SchemaStatus =
  * whether it is a fault. Null when there is no schema to speak of. `name` is
  * null for an inline schema.
  */
-export function schemaStatusText(status: SchemaStatus): { key: string; args: string[]; failed: boolean } | null {
+export function schemaStatusText(status: SchemaStatus): { key: string; args: Arg[]; failed: boolean } | null {
     switch (status.kind) {
         case "none":
             return null;
@@ -130,8 +131,8 @@ export function schemaStatusText(status: SchemaStatus): { key: string; args: str
                 : { key: "Status_SchemaNotJson", args: [name], failed: true };
         case "invalidSchema":
             return status.name === null
-                ? { key: "Status_SchemaInlineInvalid", args: [load.message], failed: true }
-                : { key: "Status_SchemaInvalid", args: [name, load.message], failed: true };
+                ? { key: "Status_SchemaInlineInvalid", args: [reasonOf(load)], failed: true }
+                : { key: "Status_SchemaInvalid", args: [name, reasonOf(load)], failed: true };
     }
 }
 
@@ -148,4 +149,9 @@ export function schemaWithholdsVerdict(status: SchemaStatus): boolean {
         return false;
     }
     return !(status.kind === "loaded" && status.load.state === "ready");
+}
+
+/** Why a schema was refused, as a message to render, or its English where it has no key. */
+function reasonOf(load: Worded): Arg {
+    return load.key ? said(load.key, ...(load.args ?? [])) : load.message;
 }

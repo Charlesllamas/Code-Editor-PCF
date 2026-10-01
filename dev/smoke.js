@@ -235,7 +235,7 @@ check('…and readable() drops that, keeping the type fault', readable(quirk.err
 const units = (schema, doc) => new Validator(schema, '2020-12', false).validate(doc).errors;
 check('a genuinely extra property is named at its key',
     readable(units({ properties: { id: {} }, additionalProperties: false }, { id: 1, zz: 2 })),
-    [{ path: ['zz'], message: 'Property "zz" is not allowed', atKey: true }]);
+    [{ path: ['zz'], message: 'Property "zz" is not allowed', key: 'Schema_PropertyNotAllowed', args: ['zz'], atKey: true }]);
 check('anyOf says so once, not once per branch',
     readable(units({ anyOf: [{ type: 'string' }, { type: 'null' }] }, 3)).map((f) => f.message), ['Does not match any of the allowed shapes']);
 check('oneOf with two matches', readable(units({ oneOf: [{ type: 'number' }, { minimum: 0 }] }, 3)).map((f) => f.message), ['Matches more than one of the allowed shapes']);
@@ -243,7 +243,7 @@ check('if/then keeps the then fault, not the if wrapper',
     readable(units({ if: { properties: { k: { const: 'a' } } }, then: { required: ['x'] } }, { k: 'a' })).map((f) => f.message), ['Missing required property "x"']);
 check('a $ref wrapper disappears behind its fault',
     readable(units({ items: { $ref: '#/$defs/t' }, $defs: { t: { type: 'string' } } }, ['a', 2])),
-    [{ path: ['1'], message: 'Expected a string, found a number', atKey: false }]);
+    [{ path: ['1'], message: 'Expected a string, found a number', key: 'Schema_TypeExpected', args: [{ key: 'Type_string', args: [] }, { key: 'Type_number', args: [] }], atKey: false }]);
 check('items: false names the item', readable(units({ prefixItems: [{}], items: false }, [1, 2])).map((f) => f.message), ['This item is not allowed here']);
 check('a property name failing its pattern is marked at the key',
     readable(units({ propertyNames: { pattern: '^[a-z]+$' } }, { Ab: 1 }))[0].atKey, true);
@@ -363,7 +363,7 @@ async function loaderChecks() {
     check('not found says to check the name and the publish', said({ kind: 'loaded', name: 'cll_/m.json', load: { state: 'notFound' } }), { key: 'Status_SchemaNotFound', args: ['cll_/m.json'], failed: true });
     check('a failure carries its status', said({ kind: 'loaded', name: 'cll_/b.json', load: { state: 'failed', status: 500 } }).args, ['cll_/b.json', '500']);
     check('inline and not JSON has its own sentence', said({ kind: 'loaded', name: null, load: fromText('{"a":') }).key, 'Status_SchemaInlineNotJson');
-    check('an invalid inline schema keeps the reason', said({ kind: 'loaded', name: null, load: fromText('{"$ref":"#/x"}') }).args, ['The schema refers to #/x, which it does not contain']);
+    check('an invalid inline schema keeps the reason, as a message to render', said({ kind: 'loaded', name: null, load: fromText('{"$ref":"#/x"}') }).args.map((a) => (typeof a === 'string' ? a : load('messages').english(a))), ['The schema refers to #/x, which it does not contain']);
 
     section('schemaLoader.ts — isValid fails closed while the schema is not in force');
 
@@ -867,9 +867,47 @@ check('filed and taken back', [fetchRegistry.get('inmemory://model/7').metadata,
 {
     // Every key index.ts can ask for, read off the source, in both languages.
     const source = require('fs').readFileSync(path.join(root, 'CodeEditor', 'index.ts'), 'utf8');
-    const keys = [...new Set([...source.matchAll(/this\.text\("([A-Za-z_]+)"/g), ...source.matchAll(/key: "([A-Za-z_]+)"/g)].map((m) => m[1]))];
+    const keys = [...new Set([...source.matchAll(/this\.text\("([A-Za-z_]+)"/g), ...source.matchAll(/key: "([A-Za-z_]+)"/g), ...source.matchAll(/said\("([A-Za-z_]+)"/g)].map((m) => m[1]))];
     const resx = (lcid) => require('fs').readFileSync(path.join(root, 'CodeEditor', 'strings', 'CodeEditor.' + lcid + '.resx'), 'utf8');
     check('every key index.ts asks for is in both languages (' + keys.length + ')', ['1033', '3082'].map((l) => keys.filter((k) => !resx(l).includes('name="' + k + '"'))), [[], []]);
+}
+
+section('messages.ts — every message in the resx, in both languages');
+
+{
+    const { ENGLISH, render, said: sayIt, english } = load('messages');
+    const read = (lcid) => {
+        const xml = require('fs').readFileSync(path.join(root, 'CodeEditor', 'strings', 'CodeEditor.' + lcid + '.resx'), 'utf8');
+        const out = {};
+        for (const m of xml.matchAll(/<data name="([^"]+)"[^>]*>\s*<value>([\s\S]*?)<\/value>/g)) {
+            out[m[1]] = m[2].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+        }
+        return out;
+    };
+    const en = read('1033');
+    const es = read('3082');
+    const keys = Object.keys(ENGLISH);
+    check('every message key is in the 1033 resx, word for word as the checks write it (' + keys.length + ')', keys.filter((k) => en[k] !== ENGLISH[k]), []);
+    const holes = (t) => (t.match(/\{\d+\}/g) || []).sort().join();
+    check('…and in the 3082 resx, translated, with the same placeholders', keys.concat(['Status_Position']).filter((k) => !es[k] || es[k] === en[k] && /[a-z]{4}/.test(en[k]) && !/^(null|true o false)$/.test(es[k]) || holes(es[k]) !== holes(en[k])), []);
+
+    // Every key a check produces is one the resx has: run each kind of fault.
+    const produced = [
+        ...validateJson('{"a": 1,}'), ...validateJson('{"a" 1}'), ...validateJson('{ // c\n}'),
+        ...compileSchema('{"type":"object","required":["id"],"properties":{"n":{"type":["string","null"]},"q":{"minimum":1},"s":{"enum":["a"]}},"additionalProperties":false}').validate('{"n":3,"q":0,"s":"b","zz":1}'),
+        ...fetchValidate(ENTITY('<atribute name="x"/><condition attribute="name" operator="null"/><attribute name="nmae" nosuch="1"/><filter><condition attribute="name" operator="equals"/></filter>'), FULL).problems,
+        ...fetchValidate('<fetch><entity name="nosuchtable"/></fetch>', FULL).problems
+    ];
+    check('every key the checks produce is in the resx', [...new Set(produced.map((p) => p.key))].filter((k) => !k || !en[k] || !es[k]), []);
+    check('…and its English is the message the suite reads', produced.filter((p) => english({ key: p.key, args: p.args || [] }) !== p.message).map((p) => p.message), []);
+
+    const spanish = (key) => es[key] || null;
+    const typeFault = produced.find((p) => p.key === 'Schema_TypeExpected');
+    check('rendered from the 3082 resx, a fault reads in Spanish — the type list and its "or" too', render({ key: typeFault.key, args: typeFault.args }, spanish), 'Se esperaba una cadena o null, se encontró un número');
+    check('…a FetchXML fault', render({ key: 'Fetch_UnknownElement', args: ['atribute', 'entity', '<attribute>'] }, spanish), '<atribute> no es un elemento de FetchXML: <entity> admite <attribute>');
+    check('…the strip\'s position', render(sayIt('Status_Position', '5', '6', 'x'), spanish), 'Lín. 5, col. 6: x');
+    check('a key with no translation falls back to the English', render(sayIt('Json_ValueExpected'), () => null), 'Expected a value');
+    check('a placeholder used twice is filled twice', render({ key: 'x', args: ['a'] }, () => '{0} and {0}'), 'a and a');
 }
 
 /*

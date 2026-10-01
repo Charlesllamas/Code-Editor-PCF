@@ -671,6 +671,19 @@ options) and none after.
   Monaco's own commands on `window.__harnessInstance` — set the text, place
   the caret, `editor.action.triggerSuggest`, `acceptSelectedSuggestion` —
   and read back from the list's DOM.
+- **The messages are localised, and the pure modules still do not know it.**
+  A check cannot look a string up — the suite runs it where there is no
+  `context.resources` — so each message it writes is *worded*: the English,
+  beside the resx key and arguments it renders from (`messages.ts`), and an
+  argument may be a message itself ("a string or null" is `Schema_Or` over
+  two `Type_*` keys, so the "or" is the reader's). `index.ts` renders the key
+  in the user's language and falls back to the English. The suite holds
+  `messages.ts`'s English and the 1033 resx to the same words, the 3082 resx
+  to the same placeholders, and every key a check produces to the files; the
+  harness's *Strings* switch showed the strip and the markers in Spanish. The
+  browser's XML message, the schema library's last-resort text and Monaco's
+  own interface stay as they come, and the FetchXML descriptions stay
+  English.
 - **The template rig answers the reads now** (`_template` `e6dc631`), and
   this repository carries its `dev/host.js` and `dev/fixture.js`: the suite
   drives `metadata.ts` through the stub, the harness and the shots page answer

@@ -9,6 +9,7 @@ import { fromText, loadWebResourceSchema, SchemaStatus, schemaStatusText, schema
 import { schemaRegistry } from "./schemaRegistry";
 import { lineVisible, visibleArea } from "./clip";
 import { fetchValidate } from "./fetchValidate";
+import { Said, render, said } from "./messages";
 import { fetchRegistry } from "./fetchRegistry";
 import { Metadata, Need, metadataFor } from "./metadata";
 import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from "./overflow";
@@ -513,7 +514,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
 
         monaco.editor.setModelMarkers(model, MARKER_OWNER, this._problems.map((p) => ({
             severity: isError(p) ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
-            message: p.message,
+            message: this.problemText(p),
             startLineNumber: p.line,
             startColumn: p.column,
             endLineNumber: p.line,
@@ -666,7 +667,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             const more = this._problems.length - 1;
             const message = document.createElement("span");
             message.className = "CodeEditor-problem-text";
-            message.textContent = `Ln ${first.line}, Col ${first.column}: ${first.message}`;
+            message.textContent = this.say(said("Status_Position", String(first.line), String(first.column), this.problemText(first)));
             const parts: HTMLElement[] = [message];
             if (more > 0) {
                 const count = document.createElement("span");
@@ -697,7 +698,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             ? schemaStatusText(this._schema)
             : this._language === "fetchxml" ? metadataStatusText(this._metadata) : null;
         this._schemaLabel.hidden = schema === null;
-        this._schemaLabel.textContent = schema ? this.text(schema.key, ...schema.args) : "";
+        this._schemaLabel.textContent = schema ? this.say({ key: schema.key, args: schema.args }) : "";
         // The strip truncates; the whole sentence is one hover away.
         this._schemaLabel.title = this._schemaLabel.textContent;
         this._schemaLabel.classList.toggle("CodeEditor-schema--failed", !!schema?.failed);
@@ -717,6 +718,23 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     /** The problem the strip names: the first error, else the first warning. */
     private shownProblem(): Problem | undefined {
         return this._problems.find(isError) ?? this._problems[0];
+    }
+
+    /**
+     * A message in the user's language: its key from the .resx, its arguments
+     * rendered the same way, and the English (messages.ts) where a key has no
+     * translation — the platform answers a missing key with the key itself.
+     */
+    private say(s: Said): string {
+        return render(s, (key) => {
+            const value = this._getString(key);
+            return value && value !== key ? value : null;
+        });
+    }
+
+    /** What a problem says, in the user's language where it has a key. */
+    private problemText(p: Problem): string {
+        return p.key ? this.say({ key: p.key, args: p.args ?? [] }) : p.message;
     }
 
     private text(key: string, ...args: string[]): string {

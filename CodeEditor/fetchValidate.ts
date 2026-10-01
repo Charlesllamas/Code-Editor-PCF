@@ -24,6 +24,7 @@ import { ELEMENTS, attributeOf, elementOf, isChoice, operatorOf } from "./fetchG
 import { columnTable, linkAliases } from "./fetchScope";
 import { ColumnInfo, Need, Snapshot } from "./metadata";
 import { positionAt, Problem } from "./validate";
+import { Worded, worded } from "./messages";
 
 export interface FetchValidation {
     problems: Problem[];
@@ -36,9 +37,9 @@ const CHOICE_OPERATORS = new Set(["eq", "ne", "neq", "in", "not-in", "contain-va
 export function fetchValidate(text: string, snapshot: Snapshot | null): FetchValidation {
     const doc = scanXml(text);
     const out: FetchValidation = { problems: [], needs: [] };
-    const mark = (start: number, end: number, message: string, severity: "error" | "warning") => {
+    const mark = (start: number, end: number, said: Worded, severity: "error" | "warning") => {
         const at = positionAt(text, start);
-        out.problems.push({ line: at.line, column: at.column, length: Math.max(1, end - start), message, severity });
+        out.problems.push({ line: at.line, column: at.column, length: Math.max(1, end - start), ...said, severity });
     };
     const need = (n: Need) => {
         if (!out.needs.some((x) => JSON.stringify(x) === JSON.stringify(n))) {
@@ -49,7 +50,7 @@ export function fetchValidate(text: string, snapshot: Snapshot | null): FetchVal
     const root = doc.roots[0];
     if (root !== undefined && doc.elements[root].name !== "fetch") {
         const r = doc.elements[root];
-        mark(r.nameStart, r.nameEnd, "A FetchXML query starts with <fetch>", "warning");
+        mark(r.nameStart, r.nameEnd, worded("Fetch_NotFetch"), "warning");
         return out;
     }
 
@@ -61,49 +62,51 @@ export function fetchValidate(text: string, snapshot: Snapshot | null): FetchVal
         const parentSpec = parent ? elementOf(parent.name) : undefined;
 
         if (!spec) {
-            if (parentSpec) {
-                mark(e.nameStart, e.nameEnd, `<${e.name}> is not a FetchXML element — <${parent?.name}> takes ${list(parentSpec.children)}`, "error");
+            if (parentSpec && parent) {
+                mark(e.nameStart, e.nameEnd, parentSpec.children.length > 0
+                    ? worded("Fetch_UnknownElement", e.name, parent.name, list(parentSpec.children))
+                    : worded("Fetch_UnknownElementNone", e.name, parent.name), "error");
             }
             return;
         }
         if (parent && parentSpec && !parentSpec.children.includes(e.name)) {
             mark(e.nameStart, e.nameEnd, parentSpec.children.length > 0
-                ? `<${e.name}> cannot go in <${parent.name}> — it takes ${list(parentSpec.children)}`
-                : `<${e.name}> cannot go in <${parent.name}>, which takes no elements`, "error");
+                ? worded("Fetch_Misplaced", e.name, parent.name, list(parentSpec.children))
+                : worded("Fetch_MisplacedNone", e.name, parent.name), "error");
             return;
         }
         if (e.name === "entity" && parent && parent.children.filter((c) => doc.elements[c].name === "entity")[0] !== index) {
-            mark(e.nameStart, e.nameEnd, "A query has one <entity>; join more tables with <link-entity>", "warning");
+            mark(e.nameStart, e.nameEnd, worded("Fetch_SecondEntity"), "warning");
         }
 
         for (const attr of e.attrs) {
             const a = attributeOf(e.name, attr.name);
             const value = (attr.value ?? "").trim();
             if (!a) {
-                mark(attr.nameStart, attr.nameEnd, `<${e.name}> has no "${attr.name}" attribute — Dataverse ignores it`, "warning");
+                mark(attr.nameStart, attr.nameEnd, worded("Fetch_UnknownAttribute", e.name, attr.name), "warning");
                 continue;
             }
             if (a.kind === "operator") {
                 if (!operatorOf(value)) {
-                    mark(attr.valueStart, attr.valueEnd, `Unknown operator "${value}"`, "error");
+                    mark(attr.valueStart, attr.valueEnd, worded("Fetch_UnknownOperator", value), "error");
                 }
                 continue;
             }
             if ((a.kind === "enum" || a.kind === "boolean") && a.values && !a.values.includes(value)) {
-                mark(attr.valueStart, attr.valueEnd, `"${value}" is not one of ${list(a.values)}`, "warning");
+                mark(attr.valueStart, attr.valueEnd, worded("Fetch_NotInList", value, list(a.values)), "warning");
                 continue;
             }
             if (a.kind === "number" && !/^\d+$/.test(value)) {
-                mark(attr.valueStart, attr.valueEnd, `"${attr.name}" takes a whole number`, "warning");
+                mark(attr.valueStart, attr.valueEnd, worded("Fetch_WholeNumber", attr.name), "warning");
                 continue;
             }
             if (a.kind === "linkAlias" && value && !aliases.has(value)) {
-                mark(attr.valueStart, attr.valueEnd, `No link-entity is named or aliased "${value}"`, "warning");
+                mark(attr.valueStart, attr.valueEnd, worded("Fetch_NoAlias", value), "warning");
             }
         }
         for (const a of spec.attributes) {
             if (a.required && !attrOf(e, a.name)) {
-                mark(e.nameStart, e.nameEnd, `<${e.name}> needs a "${a.name}"`, "warning");
+                mark(e.nameStart, e.nameEnd, worded("Fetch_NeedsAttribute", e.name, a.name), "warning");
             }
         }
 
@@ -120,7 +123,7 @@ function list(names: string[]): string {
     return names.length === 0 ? "nothing" : names.map((n) => (ELEMENTS[n] ? `<${n}>` : `"${n}"`)).join(", ");
 }
 
-type Mark = (start: number, end: number, message: string, severity: "error" | "warning") => void;
+type Mark = (start: number, end: number, said: Worded, severity: "error" | "warning") => void;
 
 /** The environment's names: tables, columns, readability, a choice's options. */
 function names(doc: XmlDoc, text: string, index: number, snapshot: Snapshot, mark: Mark, need: (n: Need) => void): void {
@@ -147,7 +150,7 @@ function names(doc: XmlDoc, text: string, index: number, snapshot: Snapshot, mar
             if (load === undefined) {
                 need({ kind: "columns", table: value });
             } else if (load.state === "notFound") {
-                mark(attr.valueStart, attr.valueEnd, `There is no table "${value}" in this environment`, "warning");
+                mark(attr.valueStart, attr.valueEnd, worded("Fetch_NoTable", value), "warning");
             }
             continue;
         }
@@ -159,9 +162,9 @@ function names(doc: XmlDoc, text: string, index: number, snapshot: Snapshot, mar
             }
             const column = columns.find((c) => c.name === value);
             if (!column) {
-                mark(attr.valueStart, attr.valueEnd, `${table} has no column "${value}"`, "warning");
+                mark(attr.valueStart, attr.valueEnd, worded("Fetch_NoColumn", table, value), "warning");
             } else if (!column.readable) {
-                mark(attr.valueStart, attr.valueEnd, `${table}.${value} is not valid for read — Dataverse refuses it`, "warning");
+                mark(attr.valueStart, attr.valueEnd, worded("Fetch_NotReadable", table, value), "warning");
             }
         }
     }
@@ -195,7 +198,7 @@ function choiceValues(doc: XmlDoc, text: string, index: number, snapshot: Snapsh
     const known = new Set(load.value.map((o) => String(o.value)));
     const check = (value: string, start: number, end: number) => {
         if (value !== "" && !known.has(value)) {
-            mark(start, end, `${value} is not an option of ${table}.${name}`, "warning");
+            mark(start, end, worded("Fetch_NotAnOption", value, table, name), "warning");
         }
     };
     const valueAttr: XmlAttr | undefined = attrOf(e, "value");

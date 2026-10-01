@@ -127,7 +127,18 @@ Two resource files ship with the control:
 | Spanish (3082) | `strings/CodeEditor.3082.resx` |
 
 They cover the property display names and descriptions shown in the form
-designer. Monaco's own interface is not localised by these.
+designer, everything the strip says, the completion and hover labels, and —
+from 1.5.0 — every message the checks write: JSON syntax faults, JSON Schema
+faults, FetchXML faults and warnings, and the strip's *Ln 5, Col 6* position.
+The control shows the file for the user's language, and English where a key
+has no translation.
+
+Three things stay in the language they arrive in, because the control passes
+them through rather than writes them: the browser's own XML parser message
+(English in every browser measured), the schema library's text for a fault the
+control has no wording of its own for, and Monaco's own interface — the find
+widget, the context menu, *View Problem*. The FetchXML element, attribute and
+operator descriptions are English, from Microsoft's reference.
 
 ## The external service declaration
 

@@ -293,4 +293,184 @@
   <data name="Status_MetadataFailed" xml:space="preserve">
     <value>The table definitions could not be read ({0}) — names are not checked</value>
   </data>
+  <data name="Status_Position" xml:space="preserve">
+    <value>Ln {0}, Col {1}: {2}</value>
+  </data>
+  <data name="Json_UnexpectedCharacter" xml:space="preserve">
+    <value>Unexpected character</value>
+  </data>
+  <data name="Json_InvalidNumber" xml:space="preserve">
+    <value>Invalid number</value>
+  </data>
+  <data name="Json_PropertyNameExpected" xml:space="preserve">
+    <value>Expected a property name in double quotes</value>
+  </data>
+  <data name="Json_ValueExpected" xml:space="preserve">
+    <value>Expected a value</value>
+  </data>
+  <data name="Json_ColonExpected" xml:space="preserve">
+    <value>Expected ':'</value>
+  </data>
+  <data name="Json_CommaExpected" xml:space="preserve">
+    <value>Expected ',' or a closing bracket</value>
+  </data>
+  <data name="Json_CloseBraceExpected" xml:space="preserve">
+    <value>Expected '}'</value>
+  </data>
+  <data name="Json_CloseBracketExpected" xml:space="preserve">
+    <value>Expected ']'</value>
+  </data>
+  <data name="Json_EndOfFileExpected" xml:space="preserve">
+    <value>Unexpected content after the end of the document</value>
+  </data>
+  <data name="Json_CommentNotAllowed" xml:space="preserve">
+    <value>Comments are not allowed in JSON</value>
+  </data>
+  <data name="Json_UnterminatedComment" xml:space="preserve">
+    <value>Unterminated comment</value>
+  </data>
+  <data name="Json_UnterminatedString" xml:space="preserve">
+    <value>Unterminated string</value>
+  </data>
+  <data name="Json_UnterminatedNumber" xml:space="preserve">
+    <value>Unterminated number</value>
+  </data>
+  <data name="Json_InvalidUnicode" xml:space="preserve">
+    <value>Invalid unicode escape</value>
+  </data>
+  <data name="Json_InvalidEscape" xml:space="preserve">
+    <value>Invalid escape character</value>
+  </data>
+  <data name="Json_InvalidCharacter" xml:space="preserve">
+    <value>Invalid character in string</value>
+  </data>
+  <data name="Json_TrailingComma" xml:space="preserve">
+    <value>Trailing comma is not allowed</value>
+  </data>
+  <data name="Xml_NotWellFormed" xml:space="preserve">
+    <value>The document is not well-formed XML</value>
+  </data>
+  <data name="Schema_TypeExpected" xml:space="preserve">
+    <value>Expected {0}, found {1}</value>
+  </data>
+  <data name="Schema_Or" xml:space="preserve">
+    <value>{0} or {1}</value>
+  </data>
+  <data name="Type_string" xml:space="preserve">
+    <value>a string</value>
+  </data>
+  <data name="Type_number" xml:space="preserve">
+    <value>a number</value>
+  </data>
+  <data name="Type_integer" xml:space="preserve">
+    <value>an integer</value>
+  </data>
+  <data name="Type_boolean" xml:space="preserve">
+    <value>true or false</value>
+  </data>
+  <data name="Type_object" xml:space="preserve">
+    <value>an object</value>
+  </data>
+  <data name="Type_array" xml:space="preserve">
+    <value>an array</value>
+  </data>
+  <data name="Type_null" xml:space="preserve">
+    <value>null</value>
+  </data>
+  <data name="Schema_Required" xml:space="preserve">
+    <value>Missing required property "{0}"</value>
+  </data>
+  <data name="Schema_OneOf" xml:space="preserve">
+    <value>Must be one of {0}</value>
+  </data>
+  <data name="Schema_Const" xml:space="preserve">
+    <value>Must be {0}</value>
+  </data>
+  <data name="Schema_NoShape" xml:space="preserve">
+    <value>Does not match any of the allowed shapes</value>
+  </data>
+  <data name="Schema_ManyShapes" xml:space="preserve">
+    <value>Matches more than one of the allowed shapes</value>
+  </data>
+  <data name="Schema_NotShape" xml:space="preserve">
+    <value>Matches a shape that is not allowed</value>
+  </data>
+  <data name="Schema_Minimum" xml:space="preserve">
+    <value>Must be at least {0}</value>
+  </data>
+  <data name="Schema_Maximum" xml:space="preserve">
+    <value>Must be at most {0}</value>
+  </data>
+  <data name="Schema_ExclusiveMinimum" xml:space="preserve">
+    <value>Must be greater than {0}</value>
+  </data>
+  <data name="Schema_ExclusiveMaximum" xml:space="preserve">
+    <value>Must be less than {0}</value>
+  </data>
+  <data name="Schema_DependentRequired" xml:space="preserve">
+    <value>"{0}" also needs "{1}"</value>
+  </data>
+  <data name="Schema_ItemNotAllowed" xml:space="preserve">
+    <value>This item is not allowed here</value>
+  </data>
+  <data name="Schema_PropertyNotAllowed" xml:space="preserve">
+    <value>Property "{0}" is not allowed</value>
+  </data>
+  <data name="Schema_PropertyName" xml:space="preserve">
+    <value>Property name "{0}": {1}</value>
+  </data>
+  <data name="Schema_NotAnObject" xml:space="preserve">
+    <value>A schema is an object</value>
+  </data>
+  <data name="Schema_UnresolvedRef" xml:space="preserve">
+    <value>The schema refers to {0}, which it does not contain</value>
+  </data>
+  <data name="Fetch_NotFetch" xml:space="preserve">
+    <value>A FetchXML query starts with &lt;fetch&gt;</value>
+  </data>
+  <data name="Fetch_UnknownElement" xml:space="preserve">
+    <value>&lt;{0}&gt; is not a FetchXML element — &lt;{1}&gt; takes {2}</value>
+  </data>
+  <data name="Fetch_UnknownElementNone" xml:space="preserve">
+    <value>&lt;{0}&gt; is not a FetchXML element, and &lt;{1}&gt; takes no elements</value>
+  </data>
+  <data name="Fetch_Misplaced" xml:space="preserve">
+    <value>&lt;{0}&gt; cannot go in &lt;{1}&gt; — it takes {2}</value>
+  </data>
+  <data name="Fetch_MisplacedNone" xml:space="preserve">
+    <value>&lt;{0}&gt; cannot go in &lt;{1}&gt;, which takes no elements</value>
+  </data>
+  <data name="Fetch_SecondEntity" xml:space="preserve">
+    <value>A query has one &lt;entity&gt;; join more tables with &lt;link-entity&gt;</value>
+  </data>
+  <data name="Fetch_UnknownAttribute" xml:space="preserve">
+    <value>&lt;{0}&gt; has no "{1}" attribute — Dataverse ignores it</value>
+  </data>
+  <data name="Fetch_UnknownOperator" xml:space="preserve">
+    <value>Unknown operator "{0}"</value>
+  </data>
+  <data name="Fetch_NotInList" xml:space="preserve">
+    <value>"{0}" is not one of {1}</value>
+  </data>
+  <data name="Fetch_WholeNumber" xml:space="preserve">
+    <value>"{0}" takes a whole number</value>
+  </data>
+  <data name="Fetch_NoAlias" xml:space="preserve">
+    <value>No link-entity is named or aliased "{0}"</value>
+  </data>
+  <data name="Fetch_NeedsAttribute" xml:space="preserve">
+    <value>&lt;{0}&gt; needs a "{1}"</value>
+  </data>
+  <data name="Fetch_NoTable" xml:space="preserve">
+    <value>There is no table "{0}" in this environment</value>
+  </data>
+  <data name="Fetch_NoColumn" xml:space="preserve">
+    <value>{0} has no column "{1}"</value>
+  </data>
+  <data name="Fetch_NotReadable" xml:space="preserve">
+    <value>{0}.{1} is not valid for read — Dataverse refuses it</value>
+  </data>
+  <data name="Fetch_NotAnOption" xml:space="preserve">
+    <value>{0} is not an option of {1}.{2}</value>
+  </data>
 </root>

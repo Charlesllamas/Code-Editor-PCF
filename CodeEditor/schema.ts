@@ -31,6 +31,7 @@
 import { Validator, Schema, SchemaDraft, OutputUnit } from "@cfworker/json-schema";
 import { parse, parseTree, Node, ParseError } from "jsonc-parser";
 import { positionAt, Problem } from "./validate";
+import { Arg, Worded, list, raw, said, worded } from "./messages";
 
 /* ---------------------------------------------------------------- source */
 
@@ -70,7 +71,7 @@ export type CompiledSchema =
     // `schema` is the parsed document, for completion and hover to walk;
     // `validate` is the prepared validator.
     | { ok: true; validate: (text: string) => Problem[]; schema: unknown }
-    | { ok: false; fault: SchemaFault; message: string };
+    | ({ ok: false; fault: SchemaFault } & Worded);
 
 /**
  * Parse and prepare a schema once, so each keystroke pays only for the
@@ -84,7 +85,7 @@ export function compileSchema(text: string): CompiledSchema {
         return { ok: false, fault: "notJson", message: "The schema is not valid JSON" };
     }
     if (typeof schema !== "boolean" && (schema === null || typeof schema !== "object" || Array.isArray(schema))) {
-        return { ok: false, fault: "invalidSchema", message: "A schema is an object" };
+        return { ok: false, fault: "invalidSchema", ...worded("Schema_NotAnObject") };
     }
 
     let validator: Validator;
@@ -94,7 +95,7 @@ export function compileSchema(text: string): CompiledSchema {
         // now so the fault belongs to the schema rather than to a keystroke.
         validator.validate(null);
     } catch (error) {
-        return { ok: false, fault: "invalidSchema", message: schemaErrorText(error) };
+        return { ok: false, fault: "invalidSchema", ...schemaErrorText(error) };
     }
 
     return { ok: true, validate: (doc) => validateWith(validator, doc), schema };
@@ -115,13 +116,14 @@ export function draftOf(schema: unknown): SchemaDraft {
     return "2020-12";
 }
 
-function schemaErrorText(error: unknown): string {
+function schemaErrorText(error: unknown): Worded {
     const text = error instanceof Error ? error.message : String(error);
     const ref = /Unresolved \$ref "([^"]+)"/.exec(text);
     if (ref) {
-        return `The schema refers to ${ref[1]}, which it does not contain`;
+        return worded("Schema_UnresolvedRef", ref[1]);
     }
-    return text.split("\n")[0];
+    // The library's own sentence: no key to translate it by.
+    return raw(text.split("\n")[0]);
 }
 
 /* -------------------------------------------------------------- validate */
@@ -167,10 +169,9 @@ function validateWith(validator: Validator, text: string): Problem[] {
 }
 
 /** A fault worth showing, before it has a position. */
-export interface Fault {
+export interface Fault extends Worded {
     /** The instance path, decoded: property names and array indexes. */
     path: (string | number)[];
-    message: string;
     /** Mark the property's name rather than its value. */
     atKey: boolean;
 }
@@ -221,49 +222,53 @@ export function readable(units: OutputUnit[]): Fault[] {
             const parent = here.slice(0, here.lastIndexOf("/"));
             const isItem = kept.some((other) => other.instanceLocation === parent && ITEM_APPLICATORS.has(other.keyword));
             faults.push(isItem
-                ? { path, message: "This item is not allowed here", atKey: false }
-                : { path, message: `Property "${String(last)}" is not allowed`, atKey: true });
+                ? { path, ...worded("Schema_ItemNotAllowed"), atKey: false }
+                : { path, ...worded("Schema_PropertyNotAllowed", String(last)), atKey: true });
             continue;
         }
 
         if (unit.keywordLocation.includes("/propertyNames/")) {
-            faults.push({ path, message: `Property name "${String(path[path.length - 1])}": ${message(unit)}`, atKey: true });
+            const inner = words(unit);
+            const reason: Arg = inner.key ? said(inner.key, ...(inner.args ?? [])) : inner.message;
+            faults.push({ path, ...worded("Schema_PropertyName", String(path[path.length - 1]), reason), atKey: true });
             continue;
         }
 
-        faults.push({ path, message: message(unit), atKey: false });
+        faults.push({ path, ...words(unit), atKey: false });
     }
     return faults;
 }
 
-const ARTICLE: Record<string, string> = {
-    string: "a string",
-    number: "a number",
-    integer: "an integer",
-    boolean: "true or false",
-    object: "an object",
-    array: "an array",
-    null: "null"
-};
+const TYPES = new Set(["string", "number", "integer", "boolean", "object", "array", "null"]);
 
-function describeType(name: string): string {
-    return ARTICLE[name] ?? name;
+/** A JSON type as a reader names it — "a string" — by resx key; anything else as it is. */
+function describeType(name: string): Arg {
+    return TYPES.has(name) ? said(`Type_${name}`) : name;
+}
+
+/** "a, b or c", as messages, so the "or" is the reader's language's. */
+function either(items: Arg[]): Arg {
+    return items.length === 1 ? items[0] : said("Schema_Or", list(...items.slice(0, -1)), items[items.length - 1]);
 }
 
 /** The library's sentence, reworded where it reads as a stack trace. */
 export function message(unit: OutputUnit): string {
+    return words(unit).message;
+}
+
+/** The same, worded: the English and the resx key it renders from (messages.ts). */
+export function words(unit: OutputUnit): Worded {
     const text = unit.error;
 
     const type = /Instance type "(\w+)" is invalid\. Expected (.+)\.$/.exec(text);
     if (unit.keyword === "type" && type) {
         const expected = type[2].split(",").map((t) => describeType(t.trim().replace(/"/g, "")));
-        const list = expected.length > 1 ? `${expected.slice(0, -1).join(", ")} or ${expected[expected.length - 1]}` : expected[0];
-        return `Expected ${list}, found ${describeType(type[1])}`;
+        return worded("Schema_TypeExpected", either(expected), describeType(type[1]));
     }
 
     const required = /required property "(.+)"\.$/.exec(text);
     if (unit.keyword === "required" && required) {
-        return `Missing required property "${required[1]}"`;
+        return worded("Schema_Required", required[1]);
     }
 
     if (unit.keyword === "enum") {
@@ -271,45 +276,46 @@ export function message(unit: OutputUnit): string {
         try {
             const values: unknown[] = list ? JSON.parse(list[1]) : [];
             const shown = values.slice(0, 6).map((v) => JSON.stringify(v)).join(", ");
-            return `Must be one of ${shown}${values.length > 6 ? ", …" : ""}`;
+            return worded("Schema_OneOf", `${shown}${values.length > 6 ? ", …" : ""}`);
         } catch {
-            return tidy(text);
+            return raw(tidy(text));
         }
     }
 
     const constant = /does not match (.+)\.$/.exec(text);
     if (unit.keyword === "const" && constant) {
-        return `Must be ${constant[1]}`;
+        return worded("Schema_Const", constant[1]);
     }
 
     if (unit.keyword === "anyOf" || (unit.keyword === "oneOf" && /\(0 matches\)/.test(text))) {
-        return "Does not match any of the allowed shapes";
+        return worded("Schema_NoShape");
     }
     if (unit.keyword === "oneOf") {
-        return "Matches more than one of the allowed shapes";
+        return worded("Schema_ManyShapes");
     }
     if (unit.keyword === "not") {
-        return "Matches a shape that is not allowed";
+        return worded("Schema_NotShape");
     }
 
     // "0 is less than 1." states the arithmetic; the author wants the rule.
     const bound = /(-?[\d.e+]+)\.$/i.exec(text)?.[1];
     const RANGE: Record<string, string> = {
-        minimum: "Must be at least",
-        maximum: "Must be at most",
-        exclusiveMinimum: "Must be greater than",
-        exclusiveMaximum: "Must be less than"
+        minimum: "Schema_Minimum",
+        maximum: "Schema_Maximum",
+        exclusiveMinimum: "Schema_ExclusiveMinimum",
+        exclusiveMaximum: "Schema_ExclusiveMaximum"
     };
     if (RANGE[unit.keyword] && bound !== undefined) {
-        return `${RANGE[unit.keyword]} ${bound}`;
+        return worded(RANGE[unit.keyword], bound);
     }
 
     const dependent = /has "(.+)" but does not have "(.+)"\.$/.exec(text);
     if (unit.keyword === "dependentRequired" && dependent) {
-        return `"${dependent[1]}" also needs "${dependent[2]}"`;
+        return worded("Schema_DependentRequired", dependent[1], dependent[2]);
     }
 
-    return tidy(text);
+    // The library's own sentence: no key to translate it by.
+    return raw(tidy(text));
 }
 
 function tidy(text: string): string {
@@ -372,7 +378,7 @@ export function place(text: string, root: Node, fault: Fault): Problem {
     }
 
     const at = positionAt(text, offset);
-    return { line: at.line, column: at.column, length: Math.max(1, length), message: fault.message };
+    return { line: at.line, column: at.column, length: Math.max(1, length), message: fault.message, key: fault.key, args: fault.args };
 }
 
 function child(node: Node, segment: string | number): Node | undefined {

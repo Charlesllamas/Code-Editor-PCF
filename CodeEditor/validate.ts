@@ -13,6 +13,7 @@
 // hands back plain values; `index.ts` turns a Problem into a marker.
 
 import { parse, printParseErrorCode, ParseError, ParseErrorCode } from "jsonc-parser";
+import { Arg, worded } from "./messages";
 
 export interface Problem {
     /** 1-based, the way Monaco and people count. */
@@ -20,7 +21,10 @@ export interface Problem {
     column: number;
     /** How many characters the marker covers; at least 1. */
     length: number;
+    /** The English; `key` and `args` render it in the user's language (messages.ts). */
     message: string;
+    key?: string;
+    args?: Arg[];
     /**
      * An error unless it says otherwise. A warning is marked and named but
      * does not count against `isValid` or in `problemCount` — FetchXML's
@@ -42,24 +46,25 @@ export function isError(problem: Problem): boolean {
 /* ------------------------------------------------------------------ JSON */
 
 // jsonc-parser names its errors after what the parser expected, which reads
-// as a stack trace. These are what an author reads.
+// as a stack trace. These are what an author reads — by resx key, the English
+// in messages.ts.
 const JSON_MESSAGES: Partial<Record<ParseErrorCode, string>> = {
-    [ParseErrorCode.InvalidSymbol]: "Unexpected character",
-    [ParseErrorCode.InvalidNumberFormat]: "Invalid number",
-    [ParseErrorCode.PropertyNameExpected]: "Expected a property name in double quotes",
-    [ParseErrorCode.ValueExpected]: "Expected a value",
-    [ParseErrorCode.ColonExpected]: "Expected ':'",
-    [ParseErrorCode.CommaExpected]: "Expected ',' or a closing bracket",
-    [ParseErrorCode.CloseBraceExpected]: "Expected '}'",
-    [ParseErrorCode.CloseBracketExpected]: "Expected ']'",
-    [ParseErrorCode.EndOfFileExpected]: "Unexpected content after the end of the document",
-    [ParseErrorCode.InvalidCommentToken]: "Comments are not allowed in JSON",
-    [ParseErrorCode.UnexpectedEndOfComment]: "Unterminated comment",
-    [ParseErrorCode.UnexpectedEndOfString]: "Unterminated string",
-    [ParseErrorCode.UnexpectedEndOfNumber]: "Unterminated number",
-    [ParseErrorCode.InvalidUnicode]: "Invalid unicode escape",
-    [ParseErrorCode.InvalidEscapeCharacter]: "Invalid escape character",
-    [ParseErrorCode.InvalidCharacter]: "Invalid character in string"
+    [ParseErrorCode.InvalidSymbol]: "Json_UnexpectedCharacter",
+    [ParseErrorCode.InvalidNumberFormat]: "Json_InvalidNumber",
+    [ParseErrorCode.PropertyNameExpected]: "Json_PropertyNameExpected",
+    [ParseErrorCode.ValueExpected]: "Json_ValueExpected",
+    [ParseErrorCode.ColonExpected]: "Json_ColonExpected",
+    [ParseErrorCode.CommaExpected]: "Json_CommaExpected",
+    [ParseErrorCode.CloseBraceExpected]: "Json_CloseBraceExpected",
+    [ParseErrorCode.CloseBracketExpected]: "Json_CloseBracketExpected",
+    [ParseErrorCode.EndOfFileExpected]: "Json_EndOfFileExpected",
+    [ParseErrorCode.InvalidCommentToken]: "Json_CommentNotAllowed",
+    [ParseErrorCode.UnexpectedEndOfComment]: "Json_UnterminatedComment",
+    [ParseErrorCode.UnexpectedEndOfString]: "Json_UnterminatedString",
+    [ParseErrorCode.UnexpectedEndOfNumber]: "Json_UnterminatedNumber",
+    [ParseErrorCode.InvalidUnicode]: "Json_InvalidUnicode",
+    [ParseErrorCode.InvalidEscapeCharacter]: "Json_InvalidEscape",
+    [ParseErrorCode.InvalidCharacter]: "Json_InvalidCharacter"
 };
 
 /**
@@ -91,9 +96,9 @@ export function validateJson(text: string): Problem[] {
             length: Math.max(1, error.length),
             // The parser sees a trailing comma as "a value should be here";
             // the author sees a comma that should not.
-            message: isTrailingComma(text, error.offset)
-                ? "Trailing comma is not allowed"
-                : JSON_MESSAGES[error.error] ?? printParseErrorCode(error.error)
+            ...(isTrailingComma(text, error.offset)
+                ? worded("Json_TrailingComma")
+                : JSON_MESSAGES[error.error] ? worded(JSON_MESSAGES[error.error] as string) : { message: printParseErrorCode(error.error) })
         });
     }
     return problems;
@@ -151,22 +156,26 @@ export function describeXmlError(message: string): Problem {
 
     const chrome = /line (\d+) at column (\d+):\s*(.*)$/i.exec(flat);
     if (chrome) {
-        return { line: Number(chrome[1]), column: Number(chrome[2]), length: 1, message: tidy(chrome[3]) };
+        return { line: Number(chrome[1]), column: Number(chrome[2]), length: 1, ...tidy(chrome[3]) };
     }
 
     const firefox = /^(?:XML Parsing Error:\s*)?(.*?)\s*Location:.*?Line Number (\d+), Column (\d+)/i.exec(flat);
     if (firefox) {
-        return { line: Number(firefox[2]), column: Number(firefox[3]), length: 1, message: tidy(firefox[1]) };
+        return { line: Number(firefox[2]), column: Number(firefox[3]), length: 1, ...tidy(firefox[1]) };
     }
 
-    return { line: 1, column: 1, length: 1, message: tidy(flat) };
+    return { line: 1, column: 1, length: 1, ...tidy(flat) };
 }
 
-function tidy(message: string): string {
+/**
+ * The browser's own sentence, passed through as it came — there is no key to
+ * translate it by — or, where it says nothing, the control's own.
+ */
+function tidy(message: string): { message: string; key?: string; args?: Arg[] } {
     // libxml2 repeats the whole sentence as a "below is a rendering" block in
     // Chrome; the first sentence is the message.
     const first = message.split(/\.\s|\n/)[0].trim();
-    return first === "" ? "The document is not well-formed XML" : first;
+    return first === "" ? worded("Xml_NotWellFormed") : { message: first };
 }
 
 /* --------------------------------------------------------------- helpers */

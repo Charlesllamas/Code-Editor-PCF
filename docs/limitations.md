@@ -99,7 +99,9 @@ What that does not cover:
   say.
 - **A Yes/No column's values are not checked**, and neither is how many values
   an operator was given.
-- **The descriptions are English**, as the schema messages are.
+- **The descriptions are English** — of elements, attributes and operators,
+  from Microsoft's reference. The faults and warnings are in English and
+  Spanish, as the rest of the control is.
 - **It never runs the query.**
 
 ## Schema validation has edges
@@ -125,7 +127,9 @@ What that does not cover:
   against the schema until it does; half a document would only produce noise.
 - **An empty column passes**, schema or not. Blank is a normal state for a
   column; use a business rule if it must hold something.
-- **The messages are English**, for schema faults as for syntax faults.
+- **The messages are English and Spanish** (from 1.5.0), for schema faults as
+  for syntax faults — except a fault the control has no wording of its own
+  for, which shows the validator library's English text.
 
 ## Format covers JSON, XML and FetchXML
 
