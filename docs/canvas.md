@@ -83,6 +83,16 @@ as well as on a form. Enter takes a suggestion. Whether Tab reaches the
 editor in a canvas app — it does not on a model-driven form — is not yet
 measured, and neither is the phone client.
 
+## FetchXML in a canvas app
+
+`Language` set to `fetchxml` completes and checks **FetchXML itself** in a
+canvas app — its elements, attributes and operators, and the faults Dataverse
+would refuse, which count in `isValid` and `problemCount` as any other fault.
+**Your tables and columns are not offered**: a canvas app gives the control no
+address for your environment's Web API, so the table definitions those names
+come from cannot be read, and none is attempted. On a model-driven form they
+are — see [Model-driven apps](model-driven).
+
 ## Other rough edges
 
 - The editor fills the box you give it. A short box gets a short editor with its

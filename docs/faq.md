@@ -88,7 +88,37 @@ Yes, from 1.4.0, when a schema is in force — the same schema that checks the
 document. Type `"` where a key goes, or `:` after one, and the list opens with
 what the schema declares there; `Ctrl+Space` opens it anywhere. **Enter**
 takes a suggestion, and **Escape** closes the list. Rest the pointer on a
-property to read its description. Without a schema, nothing is suggested.
+property to read its description. Without a schema, nothing is suggested —
+except in FetchXML, below.
+
+## Can it help me write FetchXML?
+
+Yes, from 1.5.0: set **Language** to `fetchxml`. It completes FetchXML's
+elements, attributes and operators everywhere, and on a model-driven form your
+environment's tables, columns, joins and choice values too. See
+[Model-driven apps](model-driven).
+
+## Why does FetchXML not suggest my tables and columns?
+
+Three reasons, and the strip tells two of them apart:
+
+- **It is a canvas app** (or the hub's demo). There is no address to read the
+  table definitions from, so nothing is read and nothing is said; FetchXML's
+  own elements and operators are still offered.
+- **The strip says there is no access, or that they could not be read.** The
+  table definitions are read with the signed-in user's own access; a refusal
+  or a network failure is named once and kept until the form is reloaded.
+- **The column is new.** The definitions are read once per form load; reload
+  the form to see a column created since.
+
+## Why is a misspelt attribute only a warning?
+
+Because Dataverse runs the query anyway: an attribute FetchXML does not have
+is ignored, not refused, so the query does not fail — it just does not do
+what the attribute was meant to. The same goes for a table or column your
+environment does not have: it is about the environment, not the query, so it
+never counts against `isValid`. A misspelt **element** or **operator** is
+refused, and is a fault.
 
 ## Tab does not take the suggestion, or indent.
 

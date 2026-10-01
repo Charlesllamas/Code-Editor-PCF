@@ -14,7 +14,10 @@
     "monaco",
     "json",
     "xml",
-    "dark-mode"
+    "dark-mode",
+    "fetchxml",
+    "autocomplete",
+    "validation"
   ],
   "control": {
     "namespace": "PCF",
@@ -37,7 +40,9 @@
       "media/screenshot.png",
       "media/screenshot-schema.png",
       "media/screenshot-dark.png",
-      "media/screenshot-xml.png"
+      "media/screenshot-xml.png",
+      "media/screenshot-fetchxml.png",
+      "media/screenshot-fetchxml-faults.png"
     ]
   },
   "release": {
@@ -47,7 +52,7 @@
     }
   },
   "demo": {
-    "fidelity": "full",
+    "fidelity": "limited",
     "bundle": "out/controls/CodeEditor/bundle.js",
     "styles": [
       "out/controls/CodeEditor/css/CodeEditor.css"
@@ -137,10 +142,25 @@
           "validation": "on",
           "schema": ""
         }
+      },
+      {
+        "slug": "fetchxml",
+        "name": "FetchXML",
+        "description": "A FetchXML query: type < under the entity, or a space inside a tag, for what goes there. The misspelt element is a fault. On a form your tables, columns and joins come too; the demo has no environment to read them from.",
+        "props": {
+          "code": "<fetch top=\"5\">\n  <entity name=\"account\">\n    <attribute name=\"name\" />\n    <atribute name=\"accountnumber\" />\n    <filter type=\"and\">\n      <condition attribute=\"createdon\" operator=\"last-x-days\" value=\"7\" />\n    </filter>\n    \n  </entity>\n</fetch>",
+          "language": "fetchxml",
+          "theme": "auto",
+          "height": 320,
+          "fitContent": false,
+          "validation": "on",
+          "schema": ""
+        }
       }
     ],
     "limitations": [
-      "The schema is passed inline here; on a model-driven form it is a web resource, which the demo has none of. The isValid and problemCount outputs are reported but nothing in the demo consumes them."
+      "The schema is passed inline here; on a model-driven form it is a web resource, which the demo has none of. The isValid and problemCount outputs are reported but nothing in the demo consumes them.",
+      "FetchXML: your tables, columns, joins and choice values come from an environment’s table definitions, which the demo has none of, so only FetchXML’s own elements, attributes and operators are offered and checked here."
     ]
   }
 }

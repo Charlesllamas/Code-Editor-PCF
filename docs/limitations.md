@@ -25,7 +25,7 @@ Earlier releases fetched the whole of Monaco from a CDN and so supported
 everything it had a grammar for. The move to a bundled editor traded that
 breadth for a control that loads on a restricted network.
 
-## Validation covers JSON and XML, and nothing else
+## Validation covers JSON, XML and FetchXML, and nothing else
 
 Monaco's language services — completion, hover documentation, schema-aware
 validation — run in web workers. Power Apps serves a code component as one
@@ -36,10 +36,11 @@ What 1.2.0 adds is the half that needs no worker. A JSON document is parsed
 on the main thread — strictly, so comments and trailing commas are faults —
 and every fault is marked in the editor and named in the strip beneath it. An
 XML document goes through the browser's own parser, which reports the first
-fault only, because that is what `DOMParser` reports. The other twelve
-languages are coloured and not checked.
+fault only, because that is what `DOMParser` reports. From 1.5.0 a FetchXML
+document is checked as XML first and then as FetchXML (below). The other
+twelve languages are coloured and not checked.
 
-## Completion comes from the schema, and only from the schema
+## Completion comes from a JSON Schema, or from FetchXML
 
 From 1.4.0 a JSON document with a schema in force offers the schema's
 property names where a key goes and its allowed values where a value goes,
@@ -47,8 +48,8 @@ and shows a property's description when the pointer rests on it. What that
 does not cover:
 
 - **No schema, no completion.** A JSON editor without one — and every other
-  language — behaves as 1.3 did: coloured, validated where it is JSON or XML,
-  and nothing suggested. There is no word-based completion either.
+  language but FetchXML — behaves as 1.3 did: coloured, validated where it is
+  JSON or XML, and nothing suggested. There is no word-based completion either.
 - **The schema has to be in force.** Completion follows validation: JSON,
   validation on, and the schema loaded. While it is loading, missing or
   broken, nothing is offered.
@@ -64,6 +65,42 @@ does not cover:
 - **Descriptions are shown as written.** `description` is plain text;
   VS Code's `markdownDescription` is rendered as Markdown. HTML in either is
   not rendered.
+
+## FetchXML has edges
+
+From 1.5.0, `language` = `fetchxml` completes, describes and checks FetchXML.
+What that does not cover:
+
+- **Your tables and columns need a model-driven app.** They come from the
+  environment's table definitions, read through its Web API from the form's
+  own address. A canvas app gives the control no such address, so it completes
+  FetchXML's own elements, attributes and operators and nothing more — and
+  reads nothing.
+- **The definitions are read once per form load**, the first time something
+  needs them — the table list (half a megabyte on a large environment), then
+  a table's columns, its relationships or a choice's options as each is asked
+  for — and kept. A column created while the form is open appears after a
+  reload. A refusal or a network failure is kept too, and named in the strip.
+- **They are read with the signed-in user's own access.** Measured as a
+  System Administrator; what a user without customization rights is answered
+  has not been.
+- **A fault is what Dataverse refuses, and only that**: an element FetchXML
+  does not have, an element where its parent does not take it, an operator it
+  does not know. Everything else is a **warning**, which does not count in
+  `isValid` or `problemCount` — a name your environment does not have, a
+  column not valid for read, a value that is not one of a choice's options, an
+  attribute FetchXML does not have (Dataverse ignores those rather than refuse
+  them), a value outside a fixed list, a missing required attribute.
+- **The grammar is Microsoft's reference as of 1 October 2026.** An attribute
+  added to FetchXML after that is warned about until a release knows it; an
+  element added after that is marked a fault.
+- **The operator list is ranked by the column's type, never filtered.** A
+  ranking is a suggestion; which operator suits a column is the server's to
+  say.
+- **A Yes/No column's values are not checked**, and neither is how many values
+  an operator was given.
+- **The descriptions are English**, as the schema messages are.
+- **It never runs the query.**
 
 ## Schema validation has edges
 
@@ -90,12 +127,12 @@ What that does not cover:
   column; use a business rule if it must hold something.
 - **The messages are English**, for schema faults as for syntax faults.
 
-## Format covers JSON and XML
+## Format covers JSON, XML and FetchXML
 
 **Format** in the strip, `Shift+Alt+F` and the context-menu entry all run the
 same formatter. For **JSON** it keeps comments and formats as much of a broken
-document as parses. For **XML** (from 1.3.0) it re-indents elements and does
-nothing else:
+document as parses. For **XML** (from 1.3.0) and **FetchXML** (1.5.0) it
+re-indents elements and does nothing else:
 
 - An element holding text or CDATA — `<value>  spaced  </value>`, mixed
   content like `<p>Hello <b>big</b> world</p>` — is written back exactly as
@@ -104,7 +141,8 @@ nothing else:
 - Tags are never rewritten: attribute order, quotes and line breaks inside a
   tag stay yours.
 - A document that is not well-formed is not formatted at all; the button is
-  hidden while validation is showing a fault.
+  hidden while validation is showing that fault. A FetchXML fault or warning
+  does not hide it: the query is well-formed XML.
 
 Other languages have no formatter, and the button is not shown for them.
 

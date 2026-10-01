@@ -21,7 +21,7 @@ numbers, and finding out it was wrong when the integration fails.
 
 - Syntax colouring for fourteen languages: JSON, XML, SQL, YAML, Power Query M,
   DAX, Markdown, PowerShell, C#, Python, CSS, HTML, JavaScript and TypeScript.
-- **Validation for JSON and XML** — faults marked in the editor and named in
+- **Validation for JSON, XML and FetchXML** — faults marked in the editor and named in
   the strip beneath it, with a click to jump to the first. Strict JSON: no
   comments, no trailing commas.
 - **Checking against a JSON Schema** — a schema kept as a web resource in
@@ -33,7 +33,14 @@ numbers, and finding out it was wrong when the integration fails.
   allowed values where a value goes, each with its description; rest the
   pointer on a property to read what the schema says about it. Enter takes a
   suggestion.
-- **Format** for JSON and XML, from the strip, the context menu or
+- **FetchXML, with your environment's names** — set `language` to `fetchxml`
+  and the editor completes FetchXML's elements, attributes and operators, and
+  on a form your environment's tables, the columns of the table in scope with
+  their display names, the joins a `link-entity` can make (filling in `from`
+  and `to`), and a choice column's options by label. An element or an operator
+  Dataverse refuses is marked as a fault; a table or column your environment
+  does not have is a warning.
+- **Format** for JSON, XML and FetchXML, from the strip, the context menu or
   `Shift+Alt+F`.
 - **`isValid` and `problemCount`** for a canvas app to act on — a Save
   button that refuses an invalid document is one `DisplayMode` formula.
@@ -48,17 +55,20 @@ numbers, and finding out it was wrong when the integration fails.
 
 ::image{src=media/screenshot-hover.png alt="The pointer on the status property: its description, its two allowed values and its default, in a box above the line" zoom}
 
+::image{src=media/screenshot-fetchxml.png alt="A FetchXML query on account with the list open inside an attribute's name: account's columns, each with its display name beside it" zoom}
+
 ::image{src=media/screenshot-dark.png alt="The same editor in the dark theme, sized to its eight-line document" zoom}
 
 ## What you do not get
 
 :::callout{type=warning}
-**No IntelliSense beyond the schema, and no validation beyond JSON and
-XML.** Monaco's language services run in web workers, and Power Apps serves a
-code component as a single JavaScript file with no way to serve worker files
-alongside it. The JSON and XML checks, and completion from a JSON Schema, run
-on the main thread instead; without a schema nothing is suggested, and the
-other twelve languages are coloured, not flagged.
+**No IntelliSense beyond a JSON Schema and FetchXML, and no validation
+beyond JSON and XML.** Monaco's language services run in web workers, and
+Power Apps serves a code component as a single JavaScript file with no way to
+serve worker files alongside it. The JSON and XML checks, completion from a
+JSON Schema and everything FetchXML gets run on the main thread instead;
+JSON without a schema suggests nothing, and the other twelve languages are
+coloured, not flagged.
 
 **Fourteen languages, not eighty.** Monaco has grammars for around eighty; this
 control bundles a curated fourteen. Anything else renders as plain text. Adding

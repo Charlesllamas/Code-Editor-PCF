@@ -45,6 +45,12 @@ the bundle:
 | `py` | `python` |
 | `js`, `node`, `ecmascript` | `javascript` |
 | `ts` | `typescript` |
+| `fetch`, `fetch xml`, `fetch-xml` | `fetchxml` (1.5.0) |
+
+`fetchxml` is the XML grammar with FetchXML's completion, hover and checks on
+top — see [The 1.5.0 language](#the-150-language-fetchxml). An `xml` editor
+is unchanged by it: a column holding FetchXML gets the FetchXML features only
+when `language` says `fetchxml`.
 
 An unrecognised value resolves to `plaintext` rather than raising an error, so a
 misconfigured property shows up as an uncoloured document. A null or blank
@@ -88,6 +94,28 @@ Both properties are live. Changing either updates the open editor — the langua
 re-colours the current document in place, and a changed value is written in
 unless the cursor is currently inside the editor. See [Limitations](limitations)
 for why that exception exists.
+
+## The 1.5.0 language: fetchxml
+
+No new property: 1.5.0 is a value of `language`. What it reads, and from
+where:
+
+- **FetchXML itself** — its elements, their attributes and the condition
+  operators — is compiled into the control, from Microsoft's FetchXML
+  reference.
+- **Your environment's names** — the table list, a table's columns, its
+  relationships and a choice column's options — are read from the table
+  definitions through the environment's own Web API (`EntityDefinitions`),
+  the way the schema web resource is: same origin, with the signed-in user's
+  own access, no feature declared and nothing premium. Each is read the first
+  time something needs it and kept for the page; nothing is read at load, and
+  a canvas app, which has no organisation address, reads nothing.
+
+The outputs count FetchXML's faults the way they count a schema's: an element
+or an operator Dataverse refuses is a problem; a name the table definitions
+do not have is a **warning**, marked and named but not counted in
+`problemCount` and not withholding `isValid`, because it depends on the
+environment rather than on the document.
 
 ## Localisation
 

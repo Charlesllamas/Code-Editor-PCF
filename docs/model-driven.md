@@ -102,6 +102,44 @@ apps; the classic form designer offers to bind a column to them, and the form
 then fails to save.
 :::
 
+## FetchXML
+
+Set **Language** to `fetchxml` on a column that holds a FetchXML query — a
+configuration table's saved view, a flow's query, a report's dataset.
+
+As you type, the editor offers what fits where the caret is:
+
+- **Elements** — under `<entity>`, `attribute`, `filter`, `order`,
+  `link-entity`… — and the attributes each takes, required ones first.
+- **Your tables**, where a table's name goes, with their display names.
+- **The columns of the table in scope**, with their display names: the
+  `entity` or `link-entity` around the caret, or the link-entity a
+  condition's `entityname` names. `from` lists the linked table's columns,
+  `to` the columns of the table it links from.
+- **The joins a `link-entity` can make**, first in its `name` list: picking
+  one fills in `from` and `to` (and `intersect` for a many-to-many).
+- **Operators**, the ones that suit the condition's column first.
+- **A choice column's options** in a condition's `value` or `<value>`, by
+  label, inserting the number.
+
+Rest the pointer on a column, a table or an operator to read what it is.
+
+::image{src=media/screenshot-fetchxml-faults.png alt="A FetchXML query with a misspelt element underlined in red, an unknown column and a value that is not one of the choice's options underlined in amber, and the strip naming the element" zoom}
+
+**Faults and warnings.** With `validation` on, the query is checked once it is
+well-formed XML. A fault is what Dataverse refuses: an element FetchXML does
+not have, an element where its parent does not take it, an operator it does
+not know. A **warning** is the rest — a name your environment does not have
+(`account has no column "nmae"`), a column not valid for read, a value that is
+not one of a choice's options, an attribute FetchXML does not have (Dataverse
+ignores those), a value outside a fixed list. Warnings are marked in amber and
+named in the strip when there is no fault to name.
+
+The names are read from your environment's table definitions the first time
+something needs them, with your own access, and kept while the form is open:
+a column created since then appears after a reload. If they cannot be read,
+the strip says so and the FetchXML grammar still completes.
+
 ## Theme
 
 `theme: auto` follows the app. On the modern look the platform tells the
