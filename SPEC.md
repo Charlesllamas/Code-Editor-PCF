@@ -505,6 +505,50 @@ XML. **W9: completion works in a canvas app** (P6's first half); whether Tab
 reaches the editor there was not reported separately, and the phone client
 was not tried.
 
+## The 1.4.9 probe — asked before 1.5.0 is written
+
+1.5.0 makes FetchXML a language of its own: `language` = `fetchxml` (aliases
+`fetch`, `fetch xml`, `fetch-xml`), coloured by the XML grammar, with
+completion, hover and validation. FetchXML's elements, attributes and
+operators come from the control; the environment's **tables, columns,
+relationships and choice values** come from its table definitions, read
+same-origin the way the schema web resource is. Grammar faults are errors and
+count in `isValid`/`problemCount`; a name the metadata does not know is a
+warning and does not, because it depends on the environment. An `xml`
+editor is untouched. Decided with the user, 2026-10-01.
+
+Every metadata read rests on something no control in the catalogue has
+measured: a standard field control with **no feature declared** reading
+`EntityDefinitions` whole — the table list, a table's columns with their
+labels, its three kinds of relationship in one request, and a choice's
+options through a cast per type. `probe.ts` parks
+`window.__pcfCodeEditorProbe`, touches no editor and changes nothing (every
+request is a GET; the FetchXML ones ask for one row). Each answer lands
+below, verbatim and dated, and **a wrong answer removes the feature it
+names**.
+
+Set-up on the test environment: the 1.4.9 zip imported over 1.4.0 on the
+Accounts form; the Code Editor as it is (any language — the probe reads the
+context, not the editor). In the console, straight after a hard reload so the
+first request is the cold one: `copy(await window.__pcfCodeEditorProbe.all())`
+and paste the result. P6 is the same `p.env()` and `await p.root()` in the
+canvas test app.
+
+| # | Ask | Cuts |
+|---|---|---|
+| P1 | **The table list.** `p.tables()`: `EntityDefinitions?$select=LogicalName,DisplayName,EntitySetName,PrimaryIdAttribute,PrimaryNameAttribute,IsIntersect,IsValidForAdvancedFind&$filter=IsPrivate eq false&LabelLanguages=<languageId>` — status, count, bytes, ms (cold); then without `LabelLanguages`, with `$filter=IsValidForAdvancedFind eq true`, names only, and the first again (warm: cached or fetched?). | The table list. Refused or too heavy: tables are not offered, and a typed table name still gets its columns |
+| P2 | **One table's columns.** `p.columns()`: `…(LogicalName='account')/Attributes?$select=LogicalName,AttributeType,AttributeTypeName,DisplayName,Description,IsValidForRead,AttributeOf,IsLogical&LabelLanguages=…` — count, bytes, ms, and how many are shadows (`AttributeOf`), unreadable, logical, `Virtual`. `p.accepts()` then sends one FetchXML per kind — the name as an `<attribute>` and in a `<condition>` — and five faults (an unknown column, element, attribute and operator, and a condition outside a filter), recording which the server refuses and how. | Which columns are offered and which a warning may call unknown; whether the grammar errors mark what the server refuses |
+| P3 | **Relationships.** `p.relationships()`: one request expanding `ManyToOneRelationships`, `OneToManyRelationships` and `ManyToManyRelationships`, each with its own `$select` — accepted in one call? Field names, counts, ms; each kind alone if not. | The relationship item for `link-entity`; without it `from`/`to` complete as plain columns |
+| P4 | **Choice values.** `p.options()` on `industrycode`, `statecode`, `statuscode`, a Yes/No and a multi-select column, one cast segment per type (`…/Attributes(LogicalName='x')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options),GlobalOptionSet($select=Options)`; a Yes/No's are `TrueOption`/`FalseOption`) — accepted with the nested `$select`? The option's shape, ms. | Value completion, and the "not an option" warning; without it values are typed |
+| P5 | **The user's language.** `p.env().languageId`, and P1–P2's labels: arrived in that language under `LabelLanguages`? How many tables and columns have no label in it? | Display names in the list and the hover; the fallback is logical names |
+| P6 | **Canvas** (not blocking): `p.env()` — `page` and `getClientUrl` absent, present or throwing, `languageId` — and `await p.root()`, a root-relative `/api/data/v9.2/…` request: status and content type there. | Nothing; settles the field rig's canvas `page` (absent there; the dataset rig's was corrected to "present, and throws" on 25 Sep) |
+| P7 | **A Basic User** (not blocking, only if the environment has one): `p.all()` as a user without customizer rights. | Goes to `docs/limitations.md` or *Not verified* |
+
+The harness ran `p.all()` against a stub shaped from Learn's documented
+answers (2026-10-01) to prove the probe reads them — labels, kinds, the
+refusals, the three expands, and the plain-`$expand` fallback when a nested
+`$select` is refused. That proves the probe, not the platform.
+
 ## Not verified
 
 From 1.4.0:
