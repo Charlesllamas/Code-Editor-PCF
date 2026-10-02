@@ -90,19 +90,49 @@ if (problems.length > 0) {
      *
      * A repository that has not been through setup carries placeholders
      * everywhere. A repository that has carries them only where a human still
-     * has to write something — the README's three hand-written sections. Both
-     * are placeholders; telling the second one to run `npm run setup` sends
-     * somebody to re-run a script that will not help.
+     * has to write something — the README's three hand-written sections, and
+     * the summary in pcfhub.json. Both are placeholders; telling the second one
+     * to run `npm run setup` sends somebody to re-run a script that will not
+     * help.
+     *
+     * The summary is matched as the whole finding, not by its file: a
+     * pcfhub.json that has not been through setup carries a dozen other tokens
+     * and is the first case, not this one.
      */
-    const onlyProse = problems.every((problem) => problem.startsWith('README.md'));
+    const SUMMARY_UNWRITTEN = 'pcfhub.json still contains __SUMMARY__';
 
-    console.error(onlyProse
-        ? '\nThe README still has sections to write. Replace each placeholder with\n'
-            + 'prose, and delete the comment explaining what belongs there:\n'
-        : '\nThis repository is still the template. Run:\n\n  npm run setup\n');
+    const onlyProse = problems.every(
+        (problem) => problem.startsWith('README.md') || problem === SUMMARY_UNWRITTEN,
+    );
+
+    const readmeUnwritten = problems.some((problem) => problem.startsWith('README.md'));
+
+    if (!onlyProse) {
+        console.error('\nThis repository is still the template. Run:\n\n  npm run setup\n');
+    } else if (readmeUnwritten) {
+        console.error('\nThere is still prose only you can write. Replace each placeholder, and in\n'
+            + 'the README delete the comment explaining what belongs there:\n');
+    } else {
+        console.error('\nThe summary in pcfhub.json is still to write. Replace its placeholder:\n');
+    }
 
     for (const problem of problems) {
         console.error(`  ${problem}`);
+    }
+
+    /*
+     * Said here because nothing else in an adopted repository says it: the
+     * guide that documents the key is removed at adoption, and the hub's own
+     * validator is not asked until the placeholders are gone.
+     */
+    if (onlyProse && problems.includes(SUMMARY_UNWRITTEN)) {
+        console.error(
+            '\n  The summary is what the hub shows under "Overview" on the component page,\n'
+            + '  above the screenshots: what the control does, for somebody deciding whether\n'
+            + '  to install it. One or two paragraphs, 2,000 characters at most, written as a\n'
+            + '  JSON string with \\n\\n between blocks. The page renders paragraphs, "- "\n'
+            + '  lists, **bold** and `code`; a link or a heading is shown as typed.',
+        );
     }
 
     console.error('');
@@ -457,6 +487,63 @@ for (const controlDir of controlDirs) {
                 '<parameters> by that name, and a rename now is free.',
             );
         }
+    }
+}
+
+// ------------------------------------------------------ the echo of a write
+//
+// A field control that writes its bound value and also writes the incoming
+// value back into its input has to tell the two apart. The platform hands
+// every write back as an `updateView`, late and **out of order** (typing "pase
+// laur" on a real form produced "pase laur", "pase lau", "pase laur", measured
+// 2026-09-13), so a guard comparing against the latest value alone takes a
+// late echo of an earlier keystroke as the form's change: what was typed after
+// it is lost and the caret jumps to the end. And PCFHub's demo re-renders with
+// the preset's value, which taken as news wipes a visitor's edit. Both
+// scaffolds carry the fix — a list of recent writes and the host's last value
+// — and on 2 Oct 2026 three shipped controls still did not (Copy Field 0.2.0,
+// Barcode Scanner 0.2.1, Code Editor 1.5.0), each a patch release found by
+// reading, not by this check.
+//
+// A warning, because it is a regex: it fires when the sources take typing (an
+// `input` listener, Monaco's content change, a React `onChange`), notify,
+// assign an `incoming` value into an input or an editor, and show neither
+// guard by the names the scaffolds and the catalogue use (`.includes(incoming)`,
+// `lastIncoming`, `EchoGuard`). Typing is the condition because the failure is
+// a late echo of an earlier *keystroke*: a control that writes once per
+// press or drop — pcf-geo-stamp, pcf-file-drop with its in-flight write — has
+// one echo to wait for, and both do.
+
+for (const controlDir of controlDirs) {
+    const relative = `${controlDir}/ControlManifest.Input.xml`;
+    const xml = readFileSync(join(root, relative), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+
+    if (!/usage="bound"/.test(xml) || /<data-set\b/.test(xml)) {
+        continue;
+    }
+
+    let sources = '';
+
+    for (const path of walk(join(root, controlDir))) {
+        if (/\.tsx?$/.test(path)) {
+            sources += readFileSync(path, 'utf8');
+        }
+    }
+
+    const typed = /addEventListener\(\s*['"](?:input|beforeinput)['"]|onDidChangeModelContent|onChange=\{/.test(sources);
+    const writes = /otifyOutputChanged\s*\(\s*\)/.test(sources);
+    const takesBack = /\.value\s*=\s*incoming\b|\.setValue\(\s*incoming\b/.test(sources);
+    const guarded = /\.includes\(\s*incoming\s*\)|\blastIncoming\b|\bEchoGuard\b/.test(sources);
+
+    if (typed && writes && takesBack && !guarded) {
+        warnings.push(
+            `${controlDir} writes its bound value and assigns the incoming value back into its input, with no ` +
+            'guard against the echo of its own writes. The platform echoes them late and out of order, so a late ' +
+            'echo of an earlier keystroke is taken as the form\'s change — what was typed after it is lost and the ' +
+            'caret jumps to the end — and the hub demo\'s re-render with the preset value wipes an edit. Keep a ' +
+            'list of recent writes and the host\'s last value, as the scaffold does; see "The caret, and what ' +
+            'actually moves it" in the skill\'s rendering-and-hosts.md.',
+        );
     }
 }
 
