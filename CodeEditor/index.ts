@@ -13,6 +13,7 @@ import { Said, render, said } from "./messages";
 import { fetchRegistry } from "./fetchRegistry";
 import { Metadata, Need, metadataFor } from "./metadata";
 import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from "./overflow";
+import { EchoGuard } from "./echo";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -79,6 +80,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private _fitContent = false;
     private _readOnly = false;
     private _suppressChange = false;
+    /** Tells the form's own change from an echo of this control's write. */
+    private _echo = new EchoGuard();
     private _validateTimer: number | undefined;
     private _problems: Problem[] = [];
     private _getString: (key: string) => string;
@@ -160,6 +163,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
                 return;
             }
             this._code = this._editor.getValue();
+            this._echo.wrote(this._code);
             this._notifyOutputChanged();
             this.scheduleValidate();
         });
@@ -205,10 +209,15 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         // the value back asynchronously, so `incoming` is routinely a keystroke
         // behind, and writing that back resets the cursor to the top of the
         // document on every key press.
+        //
+        // Focus alone is not enough (echo.ts): an echo can land after the user
+        // clicks away, and the hub's demo repeats the preset's value on every
+        // pass. The guard is asked first so it hears every pass.
         const model = this._editor.getModel();
         const incoming = context.parameters.code.raw ?? "";
         let valueChanged = false;
-        if (model && incoming !== model.getValue() && !this._editor.hasTextFocus()) {
+        const takes = model ? this._echo.takes(incoming, model.getValue()) : false;
+        if (model && takes && !this._editor.hasTextFocus()) {
             this._suppressChange = true;
             model.setValue(incoming);
             this._suppressChange = false;

@@ -630,6 +630,41 @@ check('a pixel of rounding is forgiven', clip.lineVisible(form, { top: 119.5, bo
 check('below the fold is not', clip.lineVisible(form, { top: 790, bottom: 809 }), false);
 check('nothing visible at all', clip.lineVisible(clip.visibleArea(VIEW, [{ top: 900, left: 0, bottom: 1000, right: 10 }]), { top: 950, bottom: 960 }), false);
 
+/* ================================================================== echo */
+
+const { EchoGuard } = load('echo');
+
+section('echo.ts — the form\'s own change, or an echo of this control\'s write');
+
+{
+    // The editor holds what was typed; the form echoes each keystroke late,
+    // the earliest last (as measured), and the editor has lost focus.
+    const guard = new EchoGuard();
+    ['{"a":1', '{"a":12', '{"a":123'].forEach((v) => guard.wrote(v));
+    check('the echo of the latest write is not taken', guard.takes('{"a":123', '{"a":123'), false);
+    check('nor a late echo of an earlier keystroke — the blur-inside-the-echo-window case', guard.takes('{"a":12', '{"a":123'), false);
+    check('nor the earliest one, whatever its order', guard.takes('{"a":1', '{"a":123'), false);
+    check('a value the control never wrote is the form\'s, and is taken', guard.takes('{"set":"by a script"}', '{"a":123'), true);
+    check('…and after it, an old write coming back is the form\'s too: the list started again', guard.takes('{"a":12', '{"set":"by a script"}'), true);
+}
+
+{
+    // PCFHub's demo: the preset's value on every pass, never the output.
+    const guard = new EchoGuard();
+    check('the first pass is taken', guard.takes('{"preset":true}', ''), true);
+    guard.wrote('{"preset":true,"edited":1}');
+    check('the host repeating its last value is not news — the hub demo re-renders that way', guard.takes('{"preset":true}', '{"preset":true,"edited":1}'), false);
+    check('a different preset is', guard.takes('{"other":true}', '{"preset":true,"edited":1}'), true);
+}
+
+{
+    const guard = new EchoGuard();
+    for (let i = 0; i < 40; i += 1) {
+        guard.wrote(`v${i}`);
+    }
+    check('the list is bounded: a write sixteen back is still an echo, one older is the form\'s', [guard.takes('v24', 'v39'), guard.takes('v23', 'v39')], [false, true]);
+}
+
 /* ============================================================ page theme */
 
 const { pageTheme } = load('theme');
