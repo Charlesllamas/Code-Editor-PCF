@@ -165,7 +165,7 @@
     <value>Validación</value>
   </data>
   <data name="Validation_Desc_Key" xml:space="preserve">
-    <value>Marca errores en documentos JSON y XML y nombra el primero debajo del editor. Desactívala para JSON con comentarios.</value>
+    <value>Marca errores en documentos JSON, XML y FetchXML y nombra el primero debajo del editor. Desactívala para JSON con comentarios.</value>
   </data>
   <data name="Validation_On_Key" xml:space="preserve">
     <value>Activada</value>

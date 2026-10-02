@@ -165,7 +165,7 @@
     <value>Validation</value>
   </data>
   <data name="Validation_Desc_Key" xml:space="preserve">
-    <value>Mark faults in JSON and XML documents and name the first one under the editor. Turn off for JSON with comments.</value>
+    <value>Mark faults in JSON, XML and FetchXML documents and name the first one under the editor. Turn off for JSON with comments.</value>
   </data>
   <data name="Validation_On_Key" xml:space="preserve">
     <value>On</value>
