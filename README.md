@@ -1,5 +1,7 @@
 # Code-Editor/PCF
 
+> **Built with AI assistance · maintained.** Version 1.0 was written by hand in 2022; later versions were written with AI (Claude) and tested on a live Dataverse form, and that code has not been reviewed line by line. Maintained by Charles Llamas.
+
 > **The complete documentation is on PCFHub: <https://pcfhub.dev/components/pcf-code-editor>** — installation, configuration for model-driven and canvas apps, the API reference, examples, limitations and a live demo.
 
 [![Try it live on PCFHub](https://pcfhub.dev/badges/try-it-live.svg)](https://pcfhub.dev/components/pcf-code-editor)

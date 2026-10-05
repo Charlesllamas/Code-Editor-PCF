@@ -20,6 +20,8 @@
     "autocomplete",
     "validation"
   ],
+  "supportLevel": "maintained",
+  "builtWith": "ai-assisted",
   "control": {
     "namespace": "PCF",
     "constructor": "CodeEditor",
