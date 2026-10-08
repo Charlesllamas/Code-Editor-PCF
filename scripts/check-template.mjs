@@ -13,6 +13,7 @@
  * here would drift, then disagree, and the one nothing executes always loses.
  */
 
+import { execFileSync } from 'node:child_process';
 import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,8 +26,11 @@ const SKIP_DIRS = new Set(['.git', 'node_modules', 'out', 'bin', 'obj', 'generat
 // placeholders" — they are the things that remove them. setup.mjs deletes
 // adopt.mjs on adoption, but a repo may still be mid-flight when this runs.
 // `scripts/templates/` holds donor pages that `version.mjs` writes when a
-// release needs one — they carry `__VERSION__` for the same reason the
-// adoption scripts carry `CodeEditor`: they are the thing that fills it in.
+// release needs one — they carry the version token for the same reason the
+// adoption scripts carry the control-name token: they are the thing that
+// fills it in. (Named in words, not spelled: setup.mjs substitutes every
+// token in every file it adopts, comments included, and this sentence came
+// out of it as "the adoption scripts carry `CopyField`".)
 const SKIP_PATHS = new Set([
     'scripts/setup.mjs', 'scripts/adopt.mjs', 'scripts/add-control.mjs', 'scripts/check-template.mjs',
     'scripts/version.mjs', 'scripts/release.mjs', 'scripts/templates/migration.md',
@@ -547,6 +551,47 @@ for (const controlDir of controlDirs) {
     }
 }
 
+// ------------------------------------------------ a clear is null, not undefined
+//
+// `getOutputs()` hands back every bound property, and `refreshTypes` types each
+// one as optional — `value?: number` — so `this.value ?? undefined` compiles
+// cleanly and means the opposite of what a clear needs: `undefined` is "no
+// change". A canvas app honours that strictly and the column refuses to empty;
+// a model-driven form is more forgiving, so the bug hides on the host most
+// people test first. pcf-star-rating shipped it, and its clear button did
+// nothing in canvas. The fix is `null`, cast past the generated type.
+//
+// A warning, because it is a regex: it fires on `?? undefined` or
+// `|| undefined` inside a `getOutputs` body. A control with nothing to hand
+// back leaves the key out — `{}` — which says "no change" without spelling
+// `undefined`, and is never flagged.
+
+for (const controlDir of controlDirs) {
+    let sources = '';
+
+    for (const path of walk(join(root, controlDir))) {
+        if (/\.tsx?$/.test(path)) {
+            sources += `${readFileSync(path, 'utf8')}\n`;
+        }
+    }
+
+    // The body of every getOutputs, up to the first line that closes a member,
+    // with its comments gone: the controls that fixed this say why in a comment
+    // quoting the very pattern, and quoting it is not shipping it.
+    const bodies = [...sources.matchAll(/getOutputs\s*\([^)]*\)[^{]*\{([\s\S]*?)\n\s{0,4}\}/g)]
+        .map((m) => m[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1'));
+
+    if (bodies.some((body) => /\?\?\s*undefined\b|\|\|\s*undefined\b/.test(body))) {
+        warnings.push(
+            `${controlDir}'s getOutputs() hands a bound value back as \`undefined\` when it is empty. To the platform ` +
+            '`undefined` is "no change", so a cleared column is never cleared — strictly in a canvas app, where the ' +
+            'field refuses to empty. Return `null` cast past the generated type, ' +
+            '`value === null ? (null as unknown as undefined) : value`; see "getOutputs() returns every bound ' +
+            'property" in the skill\'s SKILL.md.',
+        );
+    }
+}
+
 // ------------------------------------------------- external service usage
 //
 // Enabling this makes the control **premium**: every end user of an app that
@@ -1042,6 +1087,31 @@ if (exists(controlsOut)) {
                 'externalised or lazy-loaded. (This is likely the development bundle; confirm against a pack.)',
             );
         }
+    }
+}
+
+/*
+ * Whether this file — and the rest of the shared tooling — is behind the
+ * template. A stale copy of these checks is the one thing a green run here
+ * cannot report on its own, because it *is* the checks: on 2026-10-08, 25 of
+ * 31 repositories carried an out-of-date copy and every one of them passed.
+ *
+ * Only with a sibling `../_template` that has `sync-rig.mjs`, and never in
+ * the template itself. CI has no sibling, so CI stays silent. A warning, never
+ * a failure: being behind is a chore, not a defect in the control.
+ */
+const siblingTemplate = resolve(root, '..', '_template');
+const syncRig = join(siblingTemplate, 'scripts', 'sync-rig.mjs');
+
+if (siblingTemplate !== root && exists(syncRig)) {
+    try {
+        const line = execFileSync(process.execPath, [syncRig, '--status', root], { encoding: 'utf8', timeout: 60000 }).trim();
+
+        if (line !== '' && line !== 'shared tooling: current') {
+            warnings.push(line);
+        }
+    } catch (error) {
+        warnings.push(`shared tooling: not compared with ../_template (${String(error.message).split(/\r?\n/)[0]})`);
     }
 }
 
