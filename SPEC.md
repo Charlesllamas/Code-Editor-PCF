@@ -927,7 +927,7 @@ cleared at the end. The form definition the app had cached kept the old
 binding through a reload; dropping the `fast-block` cache's
 `account-mainForm` entry and reloading picked the new one up.
 
-**All seven the right way.**
+**All eight the right way.**
 
 - **W1 — opens rendered.** The Markdown column opened in the preview with
   **Edit** alone in the strip; the web resource `msfp_FormsProIcon.png` drawn
@@ -952,6 +952,14 @@ binding through a reload; dropping the `fast-block` cache's
 - **W7 — a link** pressed in the preview asked for a new tab to
   `pcfhub.dev` (the built-in browser blocks tabs it did not open, and said
   so); the form did not reload.
+- **W8 — another code component writing is not a save.** The skill's
+  number-slider finding is that every write re-renders every control with
+  `["value","parameters"]`, which would read as a save here. So a second
+  Code Editor went on `cll_editor2` (`ppdev form control bind`, unbound
+  after): with a script's unsaved value in the first, three keystrokes typed
+  in the second — three writes — left the first's **Changes** where it was.
+  The auto-save 30 s later was held by duplicate detection, and **both kept
+  Changes**; *Ignore And Save* cleared both at once.
 
 No error in the console came from the control. Not walked on the form: the
 Spanish strings (read in the harness), the phone, canvas.
