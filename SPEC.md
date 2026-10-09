@@ -146,11 +146,11 @@ column holding `order.document.json`.
 | P5 | `await p.schema()` — the five faults the suite expects (`Expected a number…` at 2:9, `Must be at least 1` at 4:26, `Missing required property "sku"` at 5:5, `Must be one of…` at 7:13, `Property "note" is not allowed` at 8:3), and **no CSP violation in the console**. | The validator library |
 | P6 | Set `language` = `xml`, paste `fetchxml.xml`; `p.xml()` → `sameTree` and `browserParses` both true; `p.applyXml()`, save, reload, `p.xml().changed` false. | XML Format |
 
-### Answers (cll365, Accounts form, 2026-09-23)
+### Answers (the test environment, Accounts form, 2026-09-23)
 
 - **P1 — yes, both routes.** `context.page` is an object and
   `getClientUrl` a function on this *standard* field control; it answered
-  `https://cll365.crm.dynamics.com`, the page's own origin (`/main.aspx`,
+  `https://<org>.crm.dynamics.com`, the page's own origin (`/main.aspx`,
   client `Web`, form factor 1). `fetch` of
   `<clientUrl>/WebResources/cll_/probe/order.schema.json` → **200**, not
   redirected, `content-type: text/jscript`, `cache-control: private`, all
@@ -205,7 +205,7 @@ column holding `order.document.json`.
   cover the positions).
 - **P4b — binding an output to a column breaks the classic form's save.**
   `Is valid` bound to a Yes/No column on the classic designer's Controls
-  tab, then Save: a browser alert, *"cll365.crm.dynamics.com says
+  tab, then Save: a browser alert, *"<org>.crm.dynamics.com says
   [object XMLDocument]"* — the designer's error path stringifying the
   server's XML reply — and the form was not saved. So an output is **not**
   a way to store the result on a model-driven form, and the docs say not to
@@ -263,7 +263,7 @@ canvas-only because binding one breaks the classic form's save.
   `dev/shots.mjs` driving headless Chrome at 2× over `dev/shots.html` —
   where it was a paragraph here, which is how a retake becomes archaeology.
 
-## The 1.3.0 walkthrough (cll365, Accounts form, 2026-09-23)
+## The 1.3.0 walkthrough (the test environment, Accounts form, 2026-09-23)
 
 1.3.0 imported over the 1.2.9 probe. All four the right way.
 
@@ -337,7 +337,7 @@ instance, not the schema).
 | P5 | With the two editors: `await p.each()` — each list's first item names its own instance. Then switch to another form tab and back: `p.env().instances` lists two, not four (`destroy` unregistered the first pair). | The registry keyed by model URI |
 | P6 | Not blocking: the canvas app's Code Editor (studio and play) and the phone client — does the list open, and can it be picked by touch? | Goes to *Not verified* or `docs/limitations.md`, never cuts |
 
-### Answers (cll365, Accounts form, 1.3.10, 2026-09-26)
+### Answers (the test environment, Accounts form, 1.3.10, 2026-09-26)
 
 - **P1 — only mode `body` puts the widgets where they belong.**
   - **`none`** (1.3's behaviour): on the last line of a 190px field the list
@@ -493,7 +493,7 @@ The 1.4.0 zip over 1.3.11 on the Accounts form, the order schema from the
 | W8 | No schema (clear the property): no list anywhere, no hover beyond marker messages. XML: no list. |
 | W9 | P6 — a canvas app with an inline schema (studio and play): does the list open, is it at the caret, does Tab reach it? The phone client: can a suggestion be picked by touch? Neither cuts; the answer goes to the docs. |
 
-### Answers (cll365, Accounts form, 1.4.0, 2026-09-26)
+### Answers (the test environment, Accounts form, 1.4.0, 2026-09-26)
 
 **All nine the right way; nothing cut.** W1 and W2 as written. W3: only the
 keys not yet in the object were offered. W4: the hover as described, whole.
@@ -549,7 +549,7 @@ answers (2026-10-01) to prove the probe reads them — labels, kinds, the
 refusals, the three expands, and the plain-`$expand` fallback when a nested
 `$select` is refused. That proves the probe, not the platform.
 
-### Answers (cll365, Accounts form, 1.4.9, 2026-10-01)
+### Answers (the test environment, Accounts form, 1.4.9, 2026-10-01)
 
 `p.all()` after a hard reload, as System Administrator: 45 requests, every one
 a GET, no feature declared. **Nothing was cut; one answer moves a fault from
@@ -710,7 +710,7 @@ Production bundle 4,365,402 bytes.
 | W11 | Not blocking: a canvas app with `language` = `fetchxml` — elements and operators complete, no `api/data` request in the Network tab, nothing in the strip. |
 | W12 | Not blocking, and only if Spanish is enabled on the environment: with the user's language set to Spanish in Personal options, the W7 faults and the strip read in Spanish (*Lín. 5, col. 6: <atribute> no es un elemento de FetchXML…*). |
 
-### Answers (cll365, Accounts form and the canvas test app, 1.5.0, 2026-10-01)
+### Answers (the test environment, Accounts form and the canvas test app, 1.5.0, 2026-10-01)
 
 **All twelve the right way; nothing cut.** W1–W7, W9 and W10 as written.
 
@@ -816,7 +816,7 @@ form's answers settle what the platform does around it.
     `actionHandler` is what stops a press reloading the page (Monaco calls
     `preventDefault` around it), so 1.6.0 always passes one.
 
-### Answers (cll365, account Information form, Grid tab, 1.5.9, 2026-10-09)
+### Answers (the test environment, account Information form, Grid tab, 1.5.9, 2026-10-09)
 
 Imported with `pac solution import --publish-changes` over 1.5.1 (2 min 38 s;
 `ppdev imports` shows it ok). The form ran the packed bundle, 4,378,005
@@ -869,7 +869,7 @@ Both records' `cll_code` and `cll_editor2` were null again at the end.
   that sets the value the editor already has.
 - **P3 — the candidate held on the form.** Monaco's default fetched the same
   three `example.com` URLs; the candidate fetched only
-  `https://cll365.crm.dynamics.com/_imgs/probe-b-md.png`, with HTML on and
+  `https://<org>.crm.dynamics.com/_imgs/probe-b-md.png`, with HTML on and
   off, and drew both allowed images. Nothing executable survived any of
   the three. **The form loads same-origin and `data:` images**: a `data:`
   GIF, `/favicon.ico`, and the web resource `msfp_FormsProIcon.png` by its
@@ -916,7 +916,7 @@ Both records' `cll_code` and `cll_editor2` were null again at the end.
   value in the harness. Not a control fault — a fresh mount that never took
   focus behaved — but worth knowing before reading a harness result.
 
-## The 1.6.0 walkthrough (cll365, account Information form, 2026-10-09)
+## The 1.6.0 walkthrough (the test environment, account Information form, 2026-10-09)
 
 Imported with `pac solution import --publish-changes` over 1.5.9; the form ran
 the packed bundle, 4,373,516 bytes. A second Code Editor was bound to
@@ -964,7 +964,7 @@ binding through a reload; dropping the `fast-block` cache's
 No error in the console came from the control. Not walked on the form: the
 Spanish strings (read in the harness), the phone, canvas.
 
-## The 1.6.0 canvas walkthrough (cll365, a new blank tablet app, 2026-10-09)
+## The 1.6.0 canvas walkthrough (the test environment, a new blank tablet app, 2026-10-09)
 
 A blank app made in Studio, never saved: the Code Editor from *Get more
 components → Code* (the 1.6.0 import), 1000 × 560, `language` markdown,
