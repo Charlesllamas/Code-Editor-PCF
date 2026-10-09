@@ -3,7 +3,7 @@
   "slug": "pcf-code-editor",
   "name": "Code Editor",
   "tagline": "Edit JSON, XML and other code in a multiline text column, with Monaco.",
-  "summary": "Replaces the plain text box on a multi-line text column with Monaco, the editor from VS Code, for solutions that keep JSON or XML in a column and need somebody to edit it safely.\n\n- Syntax colouring for fourteen languages, with bracket matching, folding, and find and replace\n- Strict validation for JSON, XML and FetchXML, with every fault marked and named\n- Checking, completion and hover from a JSON Schema kept as a web resource\n- FetchXML completion with your environment's own tables, columns and choices\n- **Format** for JSON, XML and FetchXML\n\nMonaco is compiled into the solution, so nothing is fetched at runtime. In a canvas app, `isValid` can gate a Save button; on a form the editor shows a fault but cannot refuse a save. The other languages are coloured, not checked.",
+  "summary": "Replaces the plain text box on a multi-line text column with Monaco, the editor from VS Code, for solutions that keep JSON or XML in a column and need somebody to edit it safely.\n\n- Syntax colouring for fourteen languages, with bracket matching, folding, and find and replace\n- Strict validation for JSON, XML and FetchXML, with every fault marked and named\n- Checking, completion and hover from a JSON Schema kept as a web resource\n- FetchXML completion with your environment's own tables, columns and choices\n- **Format** for JSON, XML and FetchXML\n- **Changes**: what you changed since the record was saved, side by side, and still editable\n- A **Markdown preview**, sanitised, with images only from your own environment\n\nMonaco is compiled into the solution, so nothing is fetched at runtime. In a canvas app, `isValid` can gate a Save button; on a form the editor shows a fault but cannot refuse a save. The other languages are coloured, not checked.",
   "category": "text-editors",
   "hosts": [
     "canvas",
@@ -18,7 +18,8 @@
     "dark-mode",
     "fetchxml",
     "autocomplete",
-    "validation"
+    "validation",
+    "markdown"
   ],
   "supportLevel": "maintained",
   "builtWith": "ai-assisted",
@@ -45,7 +46,9 @@
       "media/screenshot-dark.png",
       "media/screenshot-xml.png",
       "media/screenshot-fetchxml.png",
-      "media/screenshot-fetchxml-faults.png"
+      "media/screenshot-fetchxml-faults.png",
+      "media/screenshot-changes.png",
+      "media/screenshot-markdown.png"
     ]
   },
   "release": {
@@ -72,7 +75,8 @@
           "height": 320,
           "fitContent": false,
           "validation": "on",
-          "schema": ""
+          "schema": "",
+          "markdownView": "edit"
         },
         "isDefault": true
       },
@@ -87,7 +91,8 @@
           "height": 320,
           "fitContent": false,
           "validation": "on",
-          "schema": ""
+          "schema": "",
+          "markdownView": "edit"
         }
       },
       {
@@ -101,7 +106,8 @@
           "height": 320,
           "fitContent": false,
           "validation": "on",
-          "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\"},\"lines\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\"},\"qty\":{\"type\":\"integer\",\"minimum\":1}}}},\"status\":{\"enum\":[\"open\",\"closed\"]}},\"additionalProperties\":false}"
+          "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\"},\"lines\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\"},\"qty\":{\"type\":\"integer\",\"minimum\":1}}}},\"status\":{\"enum\":[\"open\",\"closed\"]}},\"additionalProperties\":false}",
+          "markdownView": "edit"
         }
       },
       {
@@ -115,7 +121,8 @@
           "height": 320,
           "fitContent": false,
           "validation": "on",
-          "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\",\"title\":\"Order number\",\"description\":\"The number the order was issued under.\"},\"lines\":{\"type\":\"array\",\"description\":\"One entry per product ordered.\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\",\"markdownDescription\":\"The **stock keeping unit**, as printed on the label.\"},\"qty\":{\"type\":\"integer\",\"minimum\":1,\"default\":1,\"description\":\"How many; at least one.\"}}}},\"status\":{\"enum\":[\"open\",\"closed\"],\"default\":\"open\",\"description\":\"Where the order is in its life.\"}},\"additionalProperties\":false}"
+          "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\",\"title\":\"Order number\",\"description\":\"The number the order was issued under.\"},\"lines\":{\"type\":\"array\",\"description\":\"One entry per product ordered.\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\",\"markdownDescription\":\"The **stock keeping unit**, as printed on the label.\"},\"qty\":{\"type\":\"integer\",\"minimum\":1,\"default\":1,\"description\":\"How many; at least one.\"}}}},\"status\":{\"enum\":[\"open\",\"closed\"],\"default\":\"open\",\"description\":\"Where the order is in its life.\"}},\"additionalProperties\":false}",
+          "markdownView": "edit"
         }
       },
       {
@@ -129,7 +136,8 @@
           "height": 400,
           "fitContent": true,
           "validation": "on",
-          "schema": ""
+          "schema": "",
+          "markdownView": "edit"
         }
       },
       {
@@ -143,7 +151,8 @@
           "height": 320,
           "fitContent": false,
           "validation": "on",
-          "schema": ""
+          "schema": "",
+          "markdownView": "edit"
         }
       },
       {
@@ -157,13 +166,45 @@
           "height": 320,
           "fitContent": false,
           "validation": "on",
-          "schema": ""
+          "schema": "",
+          "markdownView": "edit"
+        }
+      },
+      {
+        "slug": "markdown",
+        "name": "Markdown, rendered",
+        "description": "A checklist kept as Markdown and opened rendered (Open Markdown in: Preview). Images come only from the environment itself; one from another site is a link, never fetched. Edit in the strip switches to the text.",
+        "props": {
+          "code": "# Release checklist\n\nKept in a **multiline text column**, written in Markdown. Press **Edit** in the strip to change it, **Preview** to read it again.\n\n- [x] Bump the version\n- [ ] Write the release notes\n- [ ] Tag with `npm run release`\n\n| Step | Who |\n|------|-----|\n| Pack | CI |\n| Publish | You |\n\n> A bare tag publishes one compare link, so annotate it.\n\n```\ngit tag -a --cleanup=verbatim v1.6.0 -F .release-notes.md\n```\n\nAn image from another site is never loaded, only linked: ![a tracking pixel](https://example.com/pixel.png)\n\n<details><summary>Safe HTML</summary>Basic tags such as <kbd>Ctrl</kbd> and <sub>sub</sub> survive; scripts, styles, frames and media do not.</details>",
+          "language": "markdown",
+          "theme": "auto",
+          "height": 360,
+          "fitContent": false,
+          "validation": "on",
+          "schema": "",
+          "markdownView": "preview"
+        }
+      },
+      {
+        "slug": "markdown-edit",
+        "name": "Markdown, as text",
+        "description": "The same checklist opened as text, as every Markdown column did before 1.6.0. Type a line, and Changes appears in the strip: the document against what was saved, side by side where there is room.",
+        "props": {
+          "code": "# Release checklist\n\nKept in a **multiline text column**, written in Markdown. Press **Edit** in the strip to change it, **Preview** to read it again.\n\n- [x] Bump the version\n- [ ] Write the release notes\n- [ ] Tag with `npm run release`\n\n| Step | Who |\n|------|-----|\n| Pack | CI |\n| Publish | You |\n\n> A bare tag publishes one compare link, so annotate it.\n\n```\ngit tag -a --cleanup=verbatim v1.6.0 -F .release-notes.md\n```\n\nAn image from another site is never loaded, only linked: ![a tracking pixel](https://example.com/pixel.png)\n\n<details><summary>Safe HTML</summary>Basic tags such as <kbd>Ctrl</kbd> and <sub>sub</sub> survive; scripts, styles, frames and media do not.</details>",
+          "language": "markdown",
+          "theme": "auto",
+          "height": 360,
+          "fitContent": false,
+          "validation": "on",
+          "schema": "",
+          "markdownView": "edit"
         }
       }
     ],
     "limitations": [
       "The schema is passed inline here; on a model-driven form it is a web resource, which the demo has none of. The isValid and problemCount outputs are reported but nothing in the demo consumes them.",
-      "FetchXML: your tables, columns, joins and choice values come from an environment’s table definitions, which the demo has none of, so only FetchXML’s own elements, attributes and operators are offered and checked here."
+      "FetchXML: your tables, columns, joins and choice values come from an environment’s table definitions, which the demo has none of, so only FetchXML’s own elements, attributes and operators are offered and checked here.",
+      "Markdown: on a form, images from your own environment are drawn; the demo has no environment, so only inline data: images are, and a link opens nothing here. Changes compares with the preset’s text, because the demo never saves."
     ]
   }
 }

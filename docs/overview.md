@@ -46,6 +46,17 @@ numbers, and finding out it was wrong when the integration fails.
   does not have is a warning.
 - **Format** for JSON, XML and FetchXML, from the strip, the context menu or
   `Shift+Alt+F`.
+- **Changes** (from 1.6.0) — once you have changed the document, a button in
+  the strip shows it against the value as it was last saved, side by side
+  where there is room and in one column where there is not. The right-hand
+  side is the editor itself, so you can keep typing there; a save — yours or
+  the form's auto-save — becomes the new starting point.
+- **A Markdown preview** (from 1.6.0) — a Markdown column gets **Preview** in
+  the strip, and can open rendered instead of as text (*Open Markdown in*).
+  Headings, lists, task lists, tables, code and basic HTML render; scripts,
+  styles, frames and media do not. Images come only from your own
+  environment: one from another site is shown as a link, never loaded, so
+  opening a record tells nobody outside who opened it.
 - **`isValid` and `problemCount`** for a canvas app to act on — a Save
   button that refuses an invalid document is one `DisplayMode` formula.
 - **Light or dark**, following the app's theme or forced either way.
@@ -62,6 +73,10 @@ numbers, and finding out it was wrong when the integration fails.
 ::image{src=media/screenshot-fetchxml.png alt="A FetchXML query on account with the list open inside an attribute's name: account's columns, each with its display name beside it" zoom}
 
 ::image{src=media/screenshot-dark.png alt="The same editor in the dark theme, sized to its eight-line document" zoom}
+
+::image{src=media/screenshot-changes.png alt="Changes open over a JSON document edited twice: each changed line shown removed in red and added in green, the changed words highlighted, and Back to editing in the strip" zoom}
+
+::image{src=media/screenshot-markdown.png alt="A Markdown checklist rendered in the preview: a heading, ticked and unticked tasks, a table, a quotation, and an image from another site shown as a link" zoom}
 
 ## What you do not get
 

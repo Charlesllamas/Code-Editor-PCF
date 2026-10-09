@@ -164,6 +164,19 @@ from the right-click menu — all three run the same formatter. JSON and XML;
 XML is re-indented only, and an element holding text is left exactly as it
 was.
 
+## How do I see what I changed?
+
+From 1.6.0, press **Changes** in the strip. It appears once the document
+differs from the value as last saved, and shows the two side by side, or in
+one column on a narrow form. You can keep typing on the right; **Back to
+editing** returns to the plain editor. See [Model-driven apps](model-driven).
+
+## Can a Markdown column show formatted?
+
+Yes, from 1.6.0: press **Preview** in the strip, or set *Open Markdown in* to
+**Preview** and the column opens rendered. Only images from your own
+environment are drawn — see [Limitations](limitations) for why.
+
 ## Something is broken. Where do I report it?
 
 Open an issue on

@@ -117,6 +117,25 @@ do not have is a **warning**, marked and named but not counted in
 `problemCount` and not withholding `isValid`, because it depends on the
 environment rather than on the document.
 
+## The 1.6.0 property: markdownView
+
+One optional input, so a form configured for 1.5 opens exactly as it did.
+
+| Property | Usage | What it is |
+|---|---|---|
+| `markdownView` | input | *Open Markdown in*: `edit` (the default) opens a Markdown column as text, `preview` opens it rendered. The strip switches between the two either way. Ignored for every other language. |
+
+**Changes** needs no property. It is a button in the strip that appears once
+the document differs from the value as last saved, on any language, and not on
+a column the user cannot edit. What "last saved" means, and how a field
+control can tell, is under [Model-driven apps](model-driven).
+
+The preview renders with Monaco's own Markdown renderer — the one its hovers
+use, already in the bundle — through its sanitiser, with one change: images
+and other media are decided before rendering, so nothing outside your
+environment is ever fetched. A link opens in a new tab through
+`context.navigation.openUrl`, and only over `http` or `https`.
+
 ## Localisation
 
 Two resource files ship with the control:

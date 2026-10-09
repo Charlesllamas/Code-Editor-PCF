@@ -107,3 +107,12 @@ are — see [Model-driven apps](model-driven).
   that switches grammar with the record it is showing is one `Switch()` away.
   Unlike earlier releases, changing it re-colours the open document rather than
   waiting for a remount.
+- **Changes** (1.6.0) compares with the value the app last gave the control:
+  a canvas app has no form save to follow, so the `Default` is the saved value.
+  Moving a gallery to another record starts again from that record's value;
+  only what the user typed is a change.
+- **The Markdown preview** draws only inline `data:` images in a canvas app:
+  the app runs outside your environment's address, so there is no "own
+  environment" to allow images from. Links open in a new tab.
+- Neither Changes nor the preview has been tried in a canvas app yet; both
+  were measured on a model-driven form.

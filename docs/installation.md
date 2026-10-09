@@ -47,7 +47,8 @@ control swallowing the page — see [Model-driven apps](model-driven).
 
 ## Configuration
 
-The control takes two properties.
+Two properties are required — `Code` and `Language`; the rest are optional,
+and their defaults behave as earlier releases did.
 
 ::props-table{kind=input}
 

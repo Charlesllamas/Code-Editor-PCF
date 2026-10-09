@@ -53,6 +53,47 @@ and named in the strip, and the user can still save. See
 [Limitations](limitations).
 :::
 
+## Changes since the last save
+
+From 1.6.0, **Changes** appears in the strip once the document differs from
+the value as it was last saved. It opens Monaco's diff editor: the saved value
+on the left, read-only, and the editor itself on the right — completion,
+hover and the fault markers included — so typing there is typing in the
+column. **Back to editing** returns to the single editor.
+
+A control is never told the record was saved, so the editor reads it from what
+the form hands it. When the record is saved — your Save, Save & Close, or the
+auto-save, whichever column changed — the form passes the column back two or
+three times carrying the value the editor already holds, and that becomes the
+new starting point. Two things are **not** a save, by design:
+
+- **A form script or a business rule setting the column** writes the new value
+  into the editor (unless the cursor is in it) and leaves it in the diff, since
+  it is not saved yet.
+- **Reopening the record** starts from what is stored, as any new form does.
+
+One case shows more than it should: a save pressed within a second of the last
+keystroke can leave the starting point where it was until the next save, so the
+diff still shows what was just saved. It never shows less than you changed.
+
+## Markdown preview
+
+From 1.6.0, a column whose `language` is `markdown` gets **Preview** in the
+strip, and **Edit** to return. Set *Open Markdown in* to **Preview** for a
+column people mostly read — instructions, release notes, a checklist — and it
+opens rendered.
+
+- **Images** are drawn when they come from your own environment — a web
+  resource such as `/WebResources/new_/images/logo.png`, by its relative path
+  or its full address — or are written inline as `data:` images. An image on
+  any other site is shown as a link with its alt text and never loaded, so
+  opening the record tells nobody outside who opened it.
+- **Links** open in a new tab, over `http` and `https`. A `mailto:` link shows
+  as its text: through the platform it opened nothing on the test form.
+- **HTML** is rendered when it is basic markup — `<details>`, `<kbd>`, `<sub>`,
+  `<br>` and the like. Scripts, event handlers, styles, frames, forms and media
+  are removed.
+
 ## Validation and Format
 
 With `validation` on (the default), a JSON document is parsed strictly on

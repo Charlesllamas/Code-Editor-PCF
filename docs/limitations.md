@@ -192,6 +192,44 @@ consequence is that a change arriving while somebody is actively typing is
 dropped, and the editor resynchronises the next time it loses and regains the
 value.
 
+## Changes reads a save from what the form hands back
+
+A control is never told that the record was saved. **Changes** (1.6.0) reads
+it from the form's passes: after a save the form hands the column back two or
+three times carrying what the editor already holds, which nothing else does
+(measured on a model-driven form, for a Save, Save & Close and the auto-save,
+including an auto-save for another column). So:
+
+- **A save pressed within a second of your last keystroke** can leave the diff
+  comparing with the previous save until the next one. It shows more than you
+  changed, never less.
+- **A form script or business rule that sets the column** is an unsaved change
+  and stays in the diff. One that sets the value the editor already holds is
+  read as a save.
+- **On a column you cannot edit** there is no Changes button.
+- **In a canvas app and on the hub's demo** there is no form to save, so the
+  value the app hands the control is the starting point; only what you type is
+  a change. Not yet tried in a canvas app.
+
+## The Markdown preview draws only your environment's images
+
+From 1.6.0, the preview draws an image only when it comes from the
+environment the form runs in, or is an inline `data:` image. Anything else —
+another site, a CDN, a SharePoint library on another address — is a link with
+its alt text, and is never fetched. This is deliberate: an image fetched when
+a record opens tells whoever hosts it who opened the record and when.
+
+- **Images written as HTML** (`<img>`, `<video>`, `<audio>`) are removed, even
+  from your own environment. Use Markdown's `![alt](/WebResources/…)`.
+- **In a canvas app** there is no environment address, so only `data:` images
+  are drawn.
+- **Links** open over `http` and `https` in a new tab. `mailto:` and relative
+  links show as text.
+- **Rendering is Monaco's**, the renderer its hovers use. It is imported from
+  inside Monaco's package, which no public API promises, so each Monaco
+  upgrade re-checks it before release.
+- **Code blocks are not coloured** in the preview; they are shown as written.
+
 ## It cannot block a save on a form
 
 The Power Apps component framework does not let a control cancel a save, so on

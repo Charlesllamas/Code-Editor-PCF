@@ -86,8 +86,26 @@
             var FETCH = '<fetch top="5">\n  <entity name="account">\n    <attribute name="name" />\n    <attribute name="" />\n  </entity>\n</fetch>';
             var FETCH_FAULTS = '<fetch top="5">\n  <entity name="account">\n    <attribute name="name" />\n    <attribute name="nmae" />\n    <atribute name="accountnumber" />\n    <filter type="and">\n      <condition attribute="industrycode" operator="eq" value="99" />\n    </filter>\n  </entity>\n</fetch>';
 
+            // 1.6.0: a Markdown column opened rendered, and a document edited
+            // twice with Changes open over it.
+            var MARKDOWN = '# Release checklist\n\nKept in a **multiline text column**, written in Markdown.\n\n- [x] Bump the version\n- [ ] Write the release notes\n- [ ] Tag with `npm run release`\n\n| Step | Who |\n|------|-----|\n| Pack | CI |\n| Publish | You |\n\n> A bare tag publishes one compare link, so annotate it.\n\nA pixel from another site is only a link: ![a tracking pixel](https://example.com/pixel.png)';
+
+            function editThenChanges(control) {
+                var editor = control._editor;
+                var replace = function (lineNumber, from, to) {
+                    var at = editor.getModel().getLineContent(lineNumber).indexOf(from) + 1;
+                    editor.setSelection({ startLineNumber: lineNumber, startColumn: at, endLineNumber: lineNumber, endColumn: at + from.length });
+                    editor.trigger('keyboard', 'type', { text: to });
+                };
+                replace(4, 'false', 'true');
+                replace(7, 'Edited in a code component', 'Reviewed in the diff');
+                control.setMode('changes');
+            }
+
             /* Each state: the column, the inputs, and the app theme. */
             var STATES = {
+                markdown: { code: MARKDOWN, language: 'markdown', theme: 'auto', height: 360, fit: false, dark: false, markdownView: 'preview' },
+                changes: { code: CONFIG, language: 'json', theme: 'auto', height: 260, fit: false, dark: false, after: editThenChanges },
                 faults: { code: FAULTS, language: 'json', theme: 'auto', height: 220, fit: false, dark: false },
                 dark: { code: CONFIG, language: 'json', theme: 'dark', height: 400, fit: true, dark: true },
                 xml: { code: XML, language: 'xml', theme: 'auto', height: 400, fit: true, dark: false },
@@ -132,7 +150,8 @@
                         height: { raw: state.height },
                         fitContent: { raw: state.fit },
                         validation: { raw: 'on' },
-                        schema: { raw: state.schema || null }
+                        schema: { raw: state.schema || null },
+                        markdownView: { raw: state.markdownView || null }
                     },
                     fluentDesignLanguage: { isDarkTheme: state.dark, tokenTheme: {}, brand: {} },
                     mode: {
