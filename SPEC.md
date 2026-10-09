@@ -816,7 +816,86 @@ form's answers settle what the platform does around it.
     `actionHandler` is what stops a press reloading the page (Monaco calls
     `preventDefault` around it), so 1.6.0 always passes one.
 
+### Answers (cll365, account Information form, Grid tab, 1.5.9, 2026-10-09)
+
+Imported with `pac solution import --publish-changes` over 1.5.1 (2 min 38 s;
+`ppdev imports` shows it ok). The form ran the packed bundle, 4,378,005
+bytes, read back through its own script URL. The steps were driven from
+the built-in browser, signed in as System Administrator, on *Probe empty*
+(`2676f16d…`). The first record tried, *asdasd*, could not be saved — the
+form requires Main Phone and it has none — so nothing was written to it.
+Both records' `cll_code` and `cll_editor2` were null again at the end.
+**Nothing was cut except `mailto:`.**
+
+- **P1 — the diff computes on the form as in the harness.** 500 lines:
+  44.7 ms to the first diff cold, longest stall 70.7 ms; again 35.7 ms
+  (76 ms). 5,000 lines: 24.7 ms (50 ms). Three changes each time, no
+  request for a worker, Monaco's fallback warning and this control's own
+  once, on the first.
+- **P2 — a save is visible, as a burst of passes carrying what the editor
+  already holds.** Every pass below is tagged `["code","parameters"]`, mount 1:
+  - Typing `abc` and clicking out: **one** pass, the new value (the echo).
+  - Ctrl+S sent from the pane did nothing — the key never reached the form
+    (not a platform finding). The Save button opened duplicate detection
+    (the probe rows share a phone number); **no pass while it was open**.
+    *Ignore and save*: **three** passes 0.88, 1.05 and 1.15 s later, the
+    same value. On *asdasd* the refused save (Main Phone required) sent
+    **none**.
+  - Typing `def` and leaving the form alone: the echo, then **two** passes
+    30.2 s later — the auto-save — the same value, header *Saved*.
+  - **Editing another column** (`cll_editor2`, "editor 2" on the same tab)
+    and waiting 5 s: **no pass at all**. Its auto-save 30 s later sent this
+    control **two** passes with its own unchanged value. So the burst is
+    the record being saved, whatever column changed.
+  - **A form script's `setValue`** (`Xrm.Page.getAttribute("cll_code")`,
+    from the console): **one** pass 20 ms later carrying the **new** value;
+    `setValue(null)` the same. A script's change is never a repeat of what
+    the editor holds.
+  - **Reopening a record inside the app** (`Xrm.Navigation.openForm`, no
+    page load): `destroy`, then a new `init` (mount 2) when the Grid tab
+    was opened, carrying the stored value. Save & Close went back through
+    a page load. The first pass's `updatedProperties` names 25 properties,
+    `entityId`, `isPageReadOnly`, `syncError` and `isEmpty` among them;
+    no later pass named any of them.
+
+  **So the baseline is "since the last save"**: the value at `init`, moved
+  by a `code` pass whose value equals the editor's text while the control
+  has written nothing for a second (an echo lands 120–430 ms after a write;
+  a save's burst 0.9 s or more after the press). A script's value differs
+  from the editor's and is taken into it as before, so it shows in the
+  diff, as an unsaved change should. The two cases that rule gets wrong,
+  both towards showing too much: a save pressed within a second of the
+  last keystroke (the baseline catches up at the next save), and a script
+  that sets the value the editor already has.
+- **P3 — the candidate held on the form.** Monaco's default fetched the same
+  three `example.com` URLs; the candidate fetched only
+  `https://cll365.crm.dynamics.com/_imgs/probe-b-md.png`, with HTML on and
+  off, and drew both allowed images. Nothing executable survived any of
+  the three. **The form loads same-origin and `data:` images**: a `data:`
+  GIF, `/favicon.ico`, and the web resource `msfp_FormsProIcon.png` by its
+  relative and its absolute path (32 px, both). No `<meta>` CSP on the
+  page.
+- **P4 — `openUrl` with an `https` URL opens a new tab** (the built-in
+  browser blocks tabs it did not open and reported the attempt); it returned
+  `undefined`, as the skill says. **`mailto:` did nothing visible** — no tab,
+  no dialog, `undefined` — so by the rule above **1.6.0 opens `http` and
+  `https` only**, the skill's allow-list; a `mailto:` link renders as its
+  text. `Object.keys(context.navigation)` is **empty** on the form while
+  `openUrl` works: the methods are on the prototype, so presence is
+  `typeof`, never a key list.
+- **P5 — canvas: not run.** Goes to *Not verified*.
+
 ## Not verified
+
+From the 1.5.9 probe:
+
+- **Canvas** (P5): the diff and the renderer in the canvas test app.
+- **`mailto:` through `openUrl` in a browser with a mail handler.** The
+  built-in browser showed nothing; 1.6.0 leaves `mailto:` out rather than
+  ship a link that may do nothing.
+- **A save by someone else arriving through a form refresh**, and a save
+  while the editor has focus: the rule should hold (a refresh's value is
+  taken, its repeat moves the baseline), but neither was watched.
 
 From 1.5.0:
 
