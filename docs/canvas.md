@@ -77,6 +77,10 @@ If(CodeEditor1.isValid, "Ready to save", CodeEditor1.problemCount & " problem(s)
 was asked for is not in force — a broken schema, say — because the document
 has not been checked against it. With **Validation** off it is always true.
 
+The control reports `isValid` as soon as it has checked the document it was
+given, so the Save button above is enabled for a valid record before anybody
+types. Before 1.6.1 it read false until the first keystroke.
+
 From 1.4.0 the same schema also suggests property names and allowed values as
 you type, and describes a property under the pointer — tried in a canvas app
 as well as on a form. Enter takes a suggestion. Whether Tab reaches the

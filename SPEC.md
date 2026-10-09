@@ -1009,6 +1009,33 @@ No console error came from the control: Monaco's worker fallback and this
 control's own warning, once each. Not walked: dark theme, the phone (Studio's
 phone preview scales the tablet screen), Spanish.
 
+## What building 1.6.1 found
+
+C6's fix is `verdict.ts`: a verdict is reported until the host has read one —
+the host calling `getOutputs`, not the control calling notify, since a notify
+made during `init` may go unanswered — and after that only when it changes.
+The suite's eight checks catch both mutations tried (reporting only on
+change: three fail; never marking it read: one fails).
+
+The rig said a canvas host has no `context.page`; C1 measured it there with a
+`getClientUrl` that throws, as the dataset rig found on 2026-09-21. `dev/host.js`
+now throws the measured message on canvas, and `page: false` is the host with
+no object (the hub's demo).
+
+## The 1.6.1 walkthrough (2026-10-09)
+
+Imported with `pac solution import --publish-changes` over 1.6.0 (2 min 13 s);
+packed bundle 4,373,688 bytes (+172).
+
+- **Canvas** — a new blank app in a fresh Studio session, `code` a JSON
+  literal, a label on `isValid` and `problemCount`: in Play, before any
+  keystroke, *isValid true | problems 0* and the strip *No problems*. A stray
+  comma typed: *isValid false | problems 1*. C6 is closed.
+- **Form** — the account Information form's Grid tab, the served bundle read
+  back and carrying the fix: the editor mounted, and the record stayed
+  *Saved* with `getIsDirty()` false. Reporting the verdict at mount hands the
+  form the value it already has, and the form does not take it as an edit.
+
 ## Not verified
 
 From the 1.5.9 probe:

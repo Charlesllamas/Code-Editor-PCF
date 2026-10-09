@@ -15,6 +15,7 @@ import { Metadata, Need, metadataFor } from "./metadata";
 import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from "./overflow";
 import { EchoGuard } from "./echo";
 import { Baseline } from "./baseline";
+import { Verdict } from "./verdict";
 import { MarkdownView, Mode, initialMode, readMarkdownView, settleMode, stripButtons } from "./strip";
 import { renderPreview } from "./preview";
 
@@ -101,8 +102,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private _schema: SchemaStatus = { kind: "none" };
     /** Bumped per schema read and on destroy: a load that lost the race is dropped. */
     private _schemaToken = 0;
-    /** The verdict last handed to the host through getOutputs. */
-    private _verdict = { isValid: true, problemCount: 0 };
+    /** The isValid and problemCount outputs, and whether the host has read them (verdict.ts). */
+    private _verdict = new Verdict();
 
     /** The latest context: layout and openUrl read it between passes. */
     private _context: ComponentFramework.Context<IInputs>;
@@ -300,11 +301,13 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      * @returns an object based on nomenclature defined in manifest.
      */
     public getOutputs(): IOutputs {
+        const verdict = this._verdict.reported();
+
         return {
             // Null, never undefined, for a column nobody has typed in: see _code.
             code: this._code ?? (null as unknown as string),
-            isValid: this._verdict.isValid,
-            problemCount: this._verdict.problemCount
+            isValid: verdict.isValid,
+            problemCount: verdict.problemCount
         };
     }
 
@@ -762,18 +765,18 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
 
         // The verdict is an output a canvas app can act on (a Save button's
         // DisplayMode), so it is handed over when it changes — on a keystroke,
-        // a schema landing, or a switch — not only when the text does.
+        // a schema landing, or a switch — not only when the text does — and
+        // until the host has read one at all (verdict.ts).
         // Validation off is the neutral verdict: valid, 0. A schema asked for
         // and not in force withholds "valid" (schemaWithholdsVerdict). A
         // warning does not count: it is about the environment, not the
         // document (fetchValidate.ts).
         const errors = this._problems.filter(isError).length;
-        const verdict = {
+        const report = this._verdict.settle({
             isValid: errors === 0 && !this.schemaWithheld(),
             problemCount: errors
-        };
-        if (verdict.isValid !== this._verdict.isValid || verdict.problemCount !== this._verdict.problemCount) {
-            this._verdict = verdict;
+        });
+        if (report) {
             this._notifyOutputChanged();
         }
     }

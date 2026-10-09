@@ -707,6 +707,28 @@ section('baseline.ts — what Changes compares with: the value as last saved (SP
     })(), [false, 'x']);
 }
 
+/* ===================================================== 1.6.1: the verdict */
+
+const { Verdict } = load('verdict');
+
+section('verdict.ts — isValid is reported until the host has read it (SPEC.md, the 1.6.0 canvas walkthrough, C6)');
+
+{
+    const VALID = { isValid: true, problemCount: 0 };
+    const v = new Verdict();
+    check('a document with nothing wrong is reported though the verdict did not change', v.settle(VALID), true);
+    check('…and again, while the host has not asked for the outputs (a notify during init can go unanswered)', v.settle(VALID), true);
+    check('the host reads it', v.reported(), VALID);
+    check('after that, the same verdict is not reported again', v.settle(VALID), false);
+    check('a fault is', v.settle({ isValid: false, problemCount: 1 }), true);
+    check('so is a second one, with the count changed', v.settle({ isValid: false, problemCount: 2 }), true);
+    check('and the way back to valid', [v.settle(VALID), v.get()], [true, VALID]);
+    check('a canvas app\'s case: a value the app hands in, nothing wrong, before any keystroke', (() => {
+        const c = new Verdict();
+        return c.settle(VALID) && c.reported().isValid;
+    })(), true);
+}
+
 const { linkTarget, imageSource, rewriteImageToken, markedIndex, IMAGE_MARK, PLACEHOLDER, MEDIA_TAGS } = load('previewPolicy');
 
 section('previewPolicy.ts — what the preview opens, and which images it draws (P3, P4)');
@@ -1099,7 +1121,14 @@ async function metadataChecks() {
     await offline.ensure([{ kind: 'columns', table: 'account' }]);
     check('offline is a state too, and what the strip names', [offline.columns('account').state, offline.failure()], ['offline', { state: 'offline' }]);
 
-    check('a canvas host has no context.page, so the control makes no reader and asks nothing', rigHost.createContext({ fixture: rigFixture, host: 'canvas' }).page, undefined);
+    check('a canvas host publishes context.page and its getClientUrl throws (C1), so the control makes no reader and asks nothing', (() => {
+        try {
+            rigHost.createContext({ fixture: rigFixture, host: 'canvas' }).page.getClientUrl();
+            return 'no throw';
+        } catch (e) {
+            return e.message;
+        }
+    })(), 'getClientUrl: Method not implemented.');
 }
 
 /* ================================================================= verdict */
