@@ -729,6 +729,93 @@ Production bundle 4,365,402 bytes.
   `api/data` request went out.
 - **W12 — Spanish**: the faults and the strip read in Spanish.
 
+## The 1.5.9 probe — asked before 1.6.0 is written
+
+1.6.0 adds two things, decided with the user on 2026-10-09:
+
+- **Changes**: a strip button that shows the document against a baseline
+  in Monaco's diff editor. The modified side is the editor's own model, so
+  typing there is typing in the column. The baseline is the value the
+  control was mounted with, moved by a value the form hands in that is not
+  an echo (`echo.ts`), and moved on save **if a save can be seen**.
+- **A Markdown preview**: Preview and Edit in the strip when the language
+  is Markdown, and a new optional property `markdownView` (`edit` |
+  `preview`, default `edit`, so a 1.5 form is unchanged) for the mode at
+  mount. Images render **from the environment's own origin only** (and
+  `data:`, which contacts nobody); any other image is a link with its alt
+  text. Links open through `openUrl`.
+
+Both reuse what the bundle already carries: `createDiffEditor` is in the
+standalone API, and the preview uses `renderMarkdown`, the renderer Monaco's
+hovers use, with `marked` 14 and the DOMPurify-based `domSanitize.js` inside
+it (`monaco-editor/base/browser/markdownRenderer`, a deep import pinned by
+the lock at 0.56.0).
+
+`probe.ts` parks `window.__pcfCodeEditorProbe` and logs every `init`,
+`updateView` and `destroy`; it changes nothing on the record. **A wrong
+answer removes the feature it names.**
+
+| # | Ask | Cuts |
+|---|---|---|
+| P1 | **The diff without a worker.** `p.diff(500)`, `p.diff(5000)`, `p.diff(500)` again: an off-screen diff editor over two JSON documents with three known changes. Time to the first `onDidUpdateDiff`, the changes found, the longest the main thread went without running a 10 ms ticker, any request for a worker, what the console said. | Changes, if it never computes or stalls the form for more than about a second |
+| P2 | **Can a field control see a save?** The pass log (`p.passes()`): time, `updatedProperties`, the bound value's length and hash, focus, mount count — across typing, Ctrl+S, the auto-save, and Save & Close then reopening. | "Since the last save". Invisible, the baseline is "since the form was opened", moved only by a value the form hands in |
+| P3 | **The renderer, and what it fetches.** `p.markdown()` renders a hostile sample three ways — Monaco's default (HTML on), the candidate (HTML on), the candidate (HTML off) — and lists what survived that could run, style the page or fetch, and which URLs each one requested. `p.images()` loads a `data:` image and three same-origin paths. | HTML in the preview, if anything executable survives the candidate (it renders with HTML off); same-origin images, if the form refuses them |
+| P4 | **`openUrl` from a press.** `p.links()` puts two buttons on the page — an `https` URL and a `mailto:` — each calling `context.navigation.openUrl` in the click. | How a preview link opens; `mailto:` links, if it does nothing |
+| P5 | **Canvas** (not blocking): `p.diff(500)` and `p.markdown()` in the canvas test app, through the console's frame selector. | Goes to *Not verified* |
+
+The candidate configuration is what 1.6.0 would ship. A `walkTokens`
+extension turns **every** Markdown image into a link before rendering; a
+same-origin or `data:` one carries a marker in its title and a placeholder
+href (`https://image.invalid/<n>`), and is drawn as an `<img>` after
+sanitising. The sanitiser's tag list is Monaco's own minus `img`, `video`,
+`audio`, `source`, `picture` and `track`, so raw-HTML media never survive.
+
+**Steps, on the Accounts form** with the 1.5.9 zip imported over 1.5.1 and
+a Code Editor on the form (any language):
+
+1. Hard reload the record. In the console:
+   `const p = window.__pcfCodeEditorProbe`.
+2. Click into the editor, type three characters, click out, then
+   `p.mark("typed")`.
+3. Ctrl+S. Wait ten seconds, then `p.mark("saved")`.
+4. Type three more characters, click out, wait 40 seconds without saving
+   (the form's auto-save, if it is on), then `p.mark("autosave window")`.
+5. `p.links()`, press each button once, and say what opened.
+6. `copy(await p.all())` and paste the result.
+7. Save & Close, open the record again, and paste `p.passes()`: whether
+   the reopen is a new mount.
+
+### Answers from the harness (localhost, Chrome, 2026-10-09)
+
+The harness is a real browser, so these settle what the library does; the
+form's answers settle what the platform does around it.
+
+- **P1 — computed without a worker, three changes as built**: 500 lines
+  43 ms to the first diff cold (longest stall 64 ms), 23 ms warm; 5,000
+  lines 17 ms (stall 39 ms). No request for a worker. The console said
+  Monaco's *Could not create web worker(s). Falling back to loading web
+  worker code in main thread* and this control's own warning, once each,
+  on the first diff only.
+- **P3 — Monaco's default fetched three third-party URLs** — the Markdown
+  image, a raw `<img>` and a `<video>` — before anything could strip them:
+  the sanitiser hands back a fragment imported into the live document, and
+  an image there loads whether it is attached or not. So the policy has to
+  run before rendering, which is what `walkTokens` does. **The candidate
+  fetched only the same-origin image**, with HTML on and off. Nothing
+  executable survived any of the three: no handlers, no `<script>`,
+  `<iframe>`, `<style>`, `<svg>`, `<form>`, `<object>`, no `style`
+  attribute, no `javascript:`, `data:` or `command:` link; the overlay
+  `<div>` survived as a plain block. A relative link (`/main.aspx…`) is
+  dropped, as the skill's `openUrl` rule wants. Tables, task lists (the
+  checkboxes disabled), `<details>`, `<sub>`, `<kbd>` and code blocks
+  survive; image syntax inside a code block stays text.
+  - **A link to `data:` is dropped by the renderer**, so the first build of
+    the candidate drew the same-origin image and lost the `data:` one;
+    the placeholder href is the fix (both drawn after it).
+  - **Every link renders as `href=""` with the target in `data-href`**: an
+    `actionHandler` is what stops a press reloading the page (Monaco calls
+    `preventDefault` around it), so 1.6.0 always passes one.
+
 ## Not verified
 
 From 1.5.0:

@@ -14,6 +14,8 @@ import { fetchRegistry } from "./fetchRegistry";
 import { Metadata, Need, metadataFor } from "./metadata";
 import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from "./overflow";
 import { EchoGuard } from "./echo";
+// THROWAWAY: the 1.5.9 probe (SPEC.md). Remove with probe.ts before 1.6.0.
+import * as probe from "./probe";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -101,6 +103,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._container = container;
         this._notifyOutputChanged = notifyOutputChanged;
         this._getString = (key) => context.resources.getString(key);
+        probe.see(context, "init", false); // THROWAWAY (probe)
 
         // Ask the platform to report container size changes through updateView.
         context.mode.trackContainerResize(true);
@@ -186,6 +189,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      * Called when any value in the property bag has changed.
      */
     public updateView(context: ComponentFramework.Context<IInputs>): void {
+        probe.see(context, "update", this._editor?.hasTextFocus() ?? false); // THROWAWAY (probe)
         const previouslyValidating = this._validate;
         this.readInputs(context);
         this._editor.updateOptions({ readOnly: this._readOnly });
@@ -254,6 +258,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      * Called when the control is to be removed from the DOM tree.
      */
     public destroy(): void {
+        probe.see(undefined, "destroy", false); // THROWAWAY (probe)
         this._schemaToken++;
         if (this._validateTimer !== undefined) {
             window.clearTimeout(this._validateTimer);
