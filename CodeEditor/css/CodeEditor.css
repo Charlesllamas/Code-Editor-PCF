@@ -188,14 +188,191 @@
     margin-right: 6px;
 }
 
-.CodeEditor-format {
+/*
+ * The buttons — Changes, Preview, the ways back, Format — together at the
+ * strip's right end, whichever of them a mode shows (strip.ts).
+ */
+.CodeEditor-actions {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
     margin-left: auto;
 }
 
 /* `hidden` loses to `display: flex` on a flex item unless said again. */
-.CodeEditor-status [hidden] {
+.CodeEditor-status [hidden],
+.CodeEditor > [hidden] {
     display: none;
+}
+
+/*
+ * 1.6.0's two views take the editor's box (the control sizes all three), so
+ * the strip stays where it was whichever is showing.
+ */
+.CodeEditor-diff {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/*
+ * The Markdown preview: the form's fonts, at reading size, on the editor's
+ * own background so switching views does not flash the theme. Colours are
+ * literals for the reason the strip's are (the top of this file).
+ */
+.CodeEditor-preview {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 0;
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 8px 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    background: #ffffff;
+    color: #242424;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview {
+    background: #1e1e1e;
+    color: #d4d4d4;
+}
+
+.CodeEditor-preview:focus-visible {
+    outline: 2px solid #000000;
+    outline-offset: -2px;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview:focus-visible {
+    outline-color: #ffffff;
+}
+
+.CodeEditor-preview > div > :first-child {
+    margin-top: 0;
+}
+
+.CodeEditor-preview h1,
+.CodeEditor-preview h2,
+.CodeEditor-preview h3,
+.CodeEditor-preview h4,
+.CodeEditor-preview h5,
+.CodeEditor-preview h6 {
+    margin: 1em 0 0.5em;
+    line-height: 1.25;
+    font-weight: 600;
+}
+
+.CodeEditor-preview h1 { font-size: 1.6em; }
+.CodeEditor-preview h2 { font-size: 1.35em; }
+.CodeEditor-preview h3 { font-size: 1.15em; }
+.CodeEditor-preview h4,
+.CodeEditor-preview h5,
+.CodeEditor-preview h6 { font-size: 1em; }
+
+.CodeEditor-preview p,
+.CodeEditor-preview ul,
+.CodeEditor-preview ol,
+.CodeEditor-preview blockquote,
+.CodeEditor-preview pre,
+.CodeEditor-preview table,
+.CodeEditor-preview details {
+    margin: 0 0 0.75em;
+}
+
+.CodeEditor-preview ul,
+.CodeEditor-preview ol {
+    padding-left: 1.5em;
+}
+
+/* A task list's checkbox is its bullet, as GitHub draws one. */
+.CodeEditor-preview li:has(> input[type="checkbox"]:first-child) {
+    list-style: none;
+    margin-left: -1.25em;
+}
+
+.CodeEditor-preview li > input[type="checkbox"]:first-child {
+    margin: 0 0.4em 0 0;
+    vertical-align: middle;
+}
+
+.CodeEditor-preview code,
+.CodeEditor-preview pre,
+.CodeEditor-preview kbd {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.9em;
+}
+
+.CodeEditor-preview code,
+.CodeEditor-preview kbd {
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.CodeEditor-preview pre {
+    padding: 8px 12px;
+    overflow: auto;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.CodeEditor-preview pre code {
+    padding: 0;
+    background: transparent;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview code,
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview kbd,
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview pre {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.CodeEditor-preview blockquote {
+    padding-left: 12px;
+    border-left: 3px solid #d1d1d1;
+    color: #616161;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview blockquote {
+    border-left-color: #5c5c5c;
+    color: #adadad;
+}
+
+.CodeEditor-preview table {
+    border-collapse: collapse;
+}
+
+.CodeEditor-preview th,
+.CodeEditor-preview td {
+    padding: 4px 8px;
+    border: 1px solid #d1d1d1;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview th,
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview td {
+    border-color: #4a4a4a;
+}
+
+.CodeEditor-preview a {
+    color: #115ea3;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-preview a {
+    color: #62abf5;
+}
+
+.CodeEditor-preview img {
+    max-width: 100%;
+}
+
+.CodeEditor-preview-empty {
+    margin: 0;
+    opacity: 0.7;
 }
 
 /*

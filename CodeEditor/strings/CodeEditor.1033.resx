@@ -188,6 +188,42 @@
   <data name="Status_FormatHint" xml:space="preserve">
     <value>Format document (Shift+Alt+F)</value>
   </data>
+  <data name="Status_Changes" xml:space="preserve">
+    <value>Changes</value>
+  </data>
+  <data name="Status_ChangesHint" xml:space="preserve">
+    <value>Show what changed since the record was last saved</value>
+  </data>
+  <data name="Status_BackToEditing" xml:space="preserve">
+    <value>Back to editing</value>
+  </data>
+  <data name="Status_Preview" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="Status_PreviewHint" xml:space="preserve">
+    <value>Show the Markdown as it reads</value>
+  </data>
+  <data name="Status_Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Preview_Empty" xml:space="preserve">
+    <value>Nothing to preview yet.</value>
+  </data>
+  <data name="Preview_ImageNotLoaded" xml:space="preserve">
+    <value>An image from another site, not loaded: {0}</value>
+  </data>
+  <data name="MarkdownView_Display_Key" xml:space="preserve">
+    <value>Open Markdown in</value>
+  </data>
+  <data name="MarkdownView_Desc_Key" xml:space="preserve">
+    <value>Whether a Markdown column opens as text to edit or rendered as it reads. The strip under it switches between the two either way. Other languages ignore it.</value>
+  </data>
+  <data name="MarkdownView_Edit_Key" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="MarkdownView_Preview_Key" xml:space="preserve">
+    <value>Preview</value>
+  </data>
   <data name="Schema_Display_Key" xml:space="preserve">
     <value>JSON schema</value>
   </data>

@@ -1,6 +1,6 @@
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import monaco, { resolveLanguage } from "./monacoSetup";
-import { displayName, isXmlFamily } from "./languages";
+import { displayName } from "./languages";
 import { hasValidator, isError, Problem, validateJson, validateXml } from "./validate";
 import { resolveHeight, resolveWidth, STATUS_BAR_HEIGHT } from "./sizing";
 import { MonacoTheme, pageTheme, ThemeVote } from "./theme";
@@ -14,8 +14,9 @@ import { fetchRegistry } from "./fetchRegistry";
 import { Metadata, Need, metadataFor } from "./metadata";
 import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from "./overflow";
 import { EchoGuard } from "./echo";
-// THROWAWAY: the 1.5.9 probe (SPEC.md). Remove with probe.ts before 1.6.0.
-import * as probe from "./probe";
+import { Baseline } from "./baseline";
+import { MarkdownView, Mode, initialMode, readMarkdownView, settleMode, stripButtons } from "./strip";
+import { renderPreview } from "./preview";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -51,6 +52,13 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private _okLabel: HTMLSpanElement;
     private _formatButton: HTMLButtonElement;
     private _schemaLabel: HTMLSpanElement;
+    /** 1.6.0: where Changes draws the diff, and where the preview renders. */
+    private _diffHost: HTMLDivElement;
+    private _previewHost: HTMLDivElement;
+    private _changesButton: HTMLButtonElement;
+    private _backButton: HTMLButtonElement;
+    private _previewButton: HTMLButtonElement;
+    private _editButton: HTMLButtonElement;
 
     private _notifyOutputChanged: () => void;
     private _editor: monaco.editor.IStandaloneCodeEditor;
@@ -96,14 +104,28 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     /** The verdict last handed to the host through getOutputs. */
     private _verdict = { isValid: true, problemCount: 0 };
 
+    /** The latest context: layout and openUrl read it between passes. */
+    private _context: ComponentFramework.Context<IInputs>;
+    /** Which of the three views is showing (strip.ts). */
+    private _mode: Mode = "edit";
+    /** `markdownView` as last read; a change re-decides the mode. */
+    private _markdownView: MarkdownView | undefined = undefined;
+    /** What Changes compares with: the value as last saved (baseline.ts). */
+    private _baseline: Baseline;
+    private _diffEditor: monaco.editor.IStandaloneDiffEditor | undefined;
+    private _diffOriginal: monaco.editor.ITextModel | undefined;
+    private _preview: { dispose(): void } | undefined;
+    /** The environment's origin, for the preview's same-origin images; null without one. */
+    private _origin: string | null = null;
+
     /**
      * Used to initialize the control instance.
      */
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
         this._container = container;
+        this._context = context;
         this._notifyOutputChanged = notifyOutputChanged;
         this._getString = (key) => context.resources.getString(key);
-        probe.see(context, "init", false); // THROWAWAY (probe)
 
         // Ask the platform to report container size changes through updateView.
         context.mode.trackContainerResize(true);
@@ -128,10 +150,14 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
 
         this._code = context.parameters.code.raw ?? null;
         this._language = resolveLanguage(context.parameters.language.raw);
+        // What the record holds as the control mounts: reopening a record is a
+        // new mount (SPEC.md, the 1.5.9 probe, P2), so this is the saved value.
+        this._baseline = new Baseline(this._code);
 
         // Decided once per mount: the organisation URL does not change between
         // passes, and every editor on the page shares the reader (metadata.ts).
         const url = clientUrl(context);
+        this._origin = originOf(url);
         const languageId = context.userSettings?.languageId;
         this._metadata = url ? metadataFor(url, typeof languageId === "number" ? languageId : null, (u, init) => fetch(u, init)) : null;
 
@@ -167,6 +193,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             }
             this._code = this._editor.getValue();
             this._echo.wrote(this._code);
+            this._baseline.wrote(Date.now());
             this._notifyOutputChanged();
             this.scheduleValidate();
         });
@@ -180,8 +207,9 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             }
         });
 
-        this.layout(context);
         this.readSchema(context);
+        this.readMarkdownView(context);
+        this.layout(context);
         this.runValidate();
     }
 
@@ -189,10 +217,11 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      * Called when any value in the property bag has changed.
      */
     public updateView(context: ComponentFramework.Context<IInputs>): void {
-        probe.see(context, "update", this._editor?.hasTextFocus() ?? false); // THROWAWAY (probe)
+        this._context = context;
         const previouslyValidating = this._validate;
         this.readInputs(context);
         this._editor.updateOptions({ readOnly: this._readOnly });
+        this._diffEditor?.updateOptions({ readOnly: this._readOnly });
         this.applyTheme(context);
 
         // Issue #3 / alias handling: swap the model's language in place.
@@ -202,6 +231,9 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             const current = this._editor.getModel();
             if (current) {
                 monaco.editor.setModelLanguage(current, language);
+            }
+            if (this._diffOriginal) {
+                monaco.editor.setModelLanguage(this._diffOriginal, language);
             }
             this._language = language;
         }
@@ -220,13 +252,35 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         const model = this._editor.getModel();
         const incoming = context.parameters.code.raw ?? "";
         let valueChanged = false;
+        // The baseline reads the pass before the editor takes anything from
+        // it: a save repeats what the editor already holds (baseline.ts).
+        if (model && this._baseline.pass(incoming, model.getValue(), context.updatedProperties, Date.now())) {
+            this._diffOriginal?.setValue(this._baseline.get());
+        }
         const takes = model ? this._echo.takes(incoming, model.getValue()) : false;
-        if (model && takes && !this._editor.hasTextFocus()) {
+        if (model && takes && !this.editorHasFocus()) {
             this._suppressChange = true;
             model.setValue(incoming);
             this._suppressChange = false;
             this._code = context.parameters.code.raw ?? null;
             valueChanged = true;
+            // Without a form (no client URL: canvas, the demo) a value the
+            // host hands in is the saved value; on a form it is a script's,
+            // unsaved, and stays in the diff (baseline.ts).
+            if (this._origin === null) {
+                this._baseline.took(incoming);
+                this._diffOriginal?.setValue(this._baseline.get());
+            }
+        }
+
+        // Read on every pass: the hub's demo changes inputs on a mounted
+        // control — a preset can switch the mode — and the mode has to stay
+        // one the language and the field allow.
+        if (!this.readMarkdownView(context)) {
+            this.setMode(this._mode);
+        }
+        if (valueChanged && this._mode === "preview") {
+            this.showPreview();
         }
 
         this.layout(context);
@@ -258,7 +312,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      * Called when the control is to be removed from the DOM tree.
      */
     public destroy(): void {
-        probe.see(undefined, "destroy", false); // THROWAWAY (probe)
+        this.closeChanges();
+        this.closePreview();
         this._schemaToken++;
         if (this._validateTimer !== undefined) {
             window.clearTimeout(this._validateTimer);
@@ -323,8 +378,165 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
 
     /** Close the completion list and the hover, if either is open. */
     private closeWidgets(): void {
-        this._editor?.trigger(MARKER_OWNER, "hideSuggestWidget", {});
-        this._editor?.trigger(MARKER_OWNER, "editor.action.hideHover", {});
+        const editor = this.activeEditor();
+        editor?.trigger(MARKER_OWNER, "hideSuggestWidget", {});
+        editor?.trigger(MARKER_OWNER, "editor.action.hideHover", {});
+    }
+
+    /* ------------------------------------------- 1.6.0: changes, preview */
+
+    /** The editor the user types in: the diff's modified side while Changes is open. */
+    private activeEditor(): monaco.editor.ICodeEditor | undefined {
+        return this._diffEditor ? this._diffEditor.getModifiedEditor() : this._editor;
+    }
+
+    /** The box the active view draws in. */
+    private activeHost(): HTMLDivElement {
+        return this._mode === "changes" ? this._diffHost : this._mode === "preview" ? this._previewHost : this._editorHost;
+    }
+
+    /** Typing in either editor holds a value the form's echo must not overwrite (echo.ts). */
+    private editorHasFocus(): boolean {
+        return this._editor.hasTextFocus() || (this._diffEditor?.getModifiedEditor().hasTextFocus() ?? false);
+    }
+
+    /**
+     * Act on `markdownView` when it changed: it decides the mode a Markdown
+     * editor mounts in, and the hub's demo switches it on a mounted control.
+     * Returns whether it changed.
+     */
+    private readMarkdownView(context: ComponentFramework.Context<IInputs>): boolean {
+        const view = readMarkdownView(context.parameters.markdownView?.raw);
+        if (view === this._markdownView) {
+            return false;
+        }
+        this._markdownView = view;
+        this.setMode(initialMode(view, this._language));
+        return true;
+    }
+
+    /**
+     * Show one of the three views (strip.ts), closing what the others had
+     * open. A mode the language or the field no longer allows settles to edit.
+     */
+    private setMode(wanted: Mode): void {
+        const next = settleMode(wanted, this._language, this._readOnly);
+        if (next === this._mode && (next !== "changes" || this._diffEditor)) {
+            return;
+        }
+        if (next !== "changes") {
+            this.closeChanges();
+        }
+        if (next !== "preview") {
+            this.closePreview();
+        }
+        this._mode = next;
+        this._editorHost.hidden = next !== "edit";
+        this._diffHost.hidden = next !== "changes";
+        this._previewHost.hidden = next !== "preview";
+        // Sized before the diff editor is born into it, for the reason the
+        // editor's host is (init): a zero-height editor never paints colour.
+        this.layout(this._context);
+        if (next === "changes") {
+            this.openChanges();
+            this.layout(this._context);
+        } else if (next === "preview") {
+            this.showPreview();
+        }
+        this.renderStatus();
+    }
+
+    /**
+     * The diff editor over the baseline and the editor's own model: typing
+     * on the right is typing in the column, with completion, hover and the
+     * markers, because they belong to the model. The left is read-only.
+     */
+    private openChanges(): void {
+        const model = this._editor.getModel();
+        if (!model || this._diffEditor) {
+            return;
+        }
+        this._diffOriginal = monaco.editor.createModel(this._baseline.get(), this._language);
+        this._diffEditor = monaco.editor.createDiffEditor(this._diffHost, {
+            automaticLayout: false,
+            readOnly: this._readOnly,
+            originalEditable: false,
+            // Side by side where there is room; one column below 900px, which
+            // is most form fields (Monaco's own breakpoint).
+            renderSideBySide: true,
+            useInlineViewWhenSpaceIsLimited: true,
+            scrollBeyondLastLine: false,
+            minimap: { enabled: false },
+            // The diff's own overview ruler is a grey band as wide as two
+            // characters, heavy beside a form field; the colour on the lines
+            // already says where the changes are.
+            renderOverviewRuler: false,
+            overflowWidgetsDomNode: this._overflowNode,
+            fixedOverflowWidgets: true
+        });
+        // The suggestion settings are each side's own, not the diff's: the
+        // modified side gets the editor's (init), for the reasons given there.
+        this._diffEditor.getModifiedEditor().updateOptions({
+            wordBasedSuggestions: "off",
+            quickSuggestions: { strings: true, other: true, comments: false },
+            acceptSuggestionOnEnter: "smart",
+            suggest: { showWords: false }
+        });
+        this._diffEditor.setModel({ original: this._diffOriginal, modified: model });
+    }
+
+    /** Dispose the diff and its baseline model; the editor's own model is left alone. */
+    private closeChanges(): void {
+        if (this._diffEditor) {
+            this._diffEditor.dispose();
+            this._diffEditor = undefined;
+            this._diffHost.replaceChildren();
+        }
+        this._diffOriginal?.dispose();
+        this._diffOriginal = undefined;
+    }
+
+    /** Render the document into the preview, or say there is nothing to render. */
+    private showPreview(): void {
+        this._preview?.dispose();
+        this._preview = undefined;
+        const text = this._editor.getValue();
+        if (text.trim() === "") {
+            const empty = document.createElement("p");
+            empty.className = "CodeEditor-preview-empty";
+            empty.textContent = this.text("Preview_Empty");
+            this._previewHost.replaceChildren(empty);
+            return;
+        }
+        this._preview = renderPreview(text, this._previewHost, {
+            origin: this._origin,
+            open: (url) => this.openUrl(url),
+            refusedTitle: (url) => this.text("Preview_ImageNotLoaded", url)
+        });
+    }
+
+    private closePreview(): void {
+        this._preview?.dispose();
+        this._preview = undefined;
+        this._previewHost?.replaceChildren();
+    }
+
+    /**
+     * A link pressed in the preview: a new tab, through the platform (P4).
+     * Presence is per method, and the bag's methods live on its prototype —
+     * `Object.keys(context.navigation)` was empty on the form — so `typeof`.
+     */
+    private openUrl(url: string): void {
+        const navigation = this._context?.navigation as unknown as { openUrl?: (u: string) => void } | undefined;
+        if (typeof navigation?.openUrl === "function") {
+            navigation.openUrl(url);
+        }
+    }
+
+    /** A mode button pressed: switch, then move focus off the button that just hid. */
+    private switchTo(mode: Mode, then: () => void): void {
+        this.setMode(mode);
+        then();
     }
 
     /**
@@ -335,21 +547,22 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      */
     private followOuterScroll(): void {
         const node = this._overflowNode;
-        if (!node || !this._editor || !node.querySelector(".suggest-widget.visible, .monaco-hover:not(.hidden)")) {
+        const editor = this.activeEditor();
+        if (!node || !editor || !node.querySelector(".suggest-widget.visible, .monaco-hover:not(.hidden)")) {
             return;
         }
-        const position = this._editor.getPosition();
-        const caret = position ? this._editor.getScrolledVisiblePosition(position) : null;
-        const dom = this._editor.getDomNode();
+        const position = editor.getPosition();
+        const caret = position ? editor.getScrolledVisiblePosition(position) : null;
+        const dom = editor.getDomNode();
         if (!caret || !dom) {
             this.closeWidgets();
             return;
         }
         const top = dom.getBoundingClientRect().top + caret.top;
-        const area = visibleArea(viewportRect(window), clipRects(this._editorHost));
+        const area = visibleArea(viewportRect(window), clipRects(this.activeHost()));
         if (lineVisible(area, { top, bottom: top + caret.height })) {
             // Monaco reads the editor's page position again as it lays out.
-            this._editor.render(true);
+            editor.render(true);
         } else {
             this.closeWidgets();
         }
@@ -496,14 +709,20 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         const size = this.resolveSize(context, contentHeight);
         this._container.style.width = `${size.width}px`;
         this._container.style.height = `${size.height}px`;
-        this._editorHost.style.height = `${Math.max(0, size.height - STATUS_BAR_HEIGHT)}px`;
+        // The three views share one box: whichever shows, the strip stays put.
+        const view = `${Math.max(0, size.height - STATUS_BAR_HEIGHT)}px`;
+        this._editorHost.style.height = view;
+        this._diffHost.style.height = view;
+        this._previewHost.style.height = view;
         return size;
     }
 
     private layout(context: ComponentFramework.Context<IInputs>): void {
         const contentHeight = this._fitContent && this._editor ? this._editor.getContentHeight() : null;
         const size = this.sizeContainer(context, contentHeight);
-        this._editor.layout({ width: size.width, height: Math.max(0, size.height - STATUS_BAR_HEIGHT) });
+        const box = { width: size.width, height: Math.max(0, size.height - STATUS_BAR_HEIGHT) };
+        this._editor.layout(box);
+        this._diffEditor?.layout(box);
     }
 
     /* -------------------------------------------------------- validation */
@@ -639,12 +858,13 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._problemButton.hidden = true;
         this._problemButton.addEventListener("click", () => {
             const first = this.shownProblem();
-            if (!first) {
+            const editor = this.activeEditor();
+            if (!first || !editor) {
                 return;
             }
-            this._editor.revealPositionInCenterIfOutsideViewport({ lineNumber: first.line, column: first.column });
-            this._editor.setPosition({ lineNumber: first.line, column: first.column });
-            this._editor.focus();
+            editor.revealPositionInCenterIfOutsideViewport({ lineNumber: first.line, column: first.column });
+            editor.setPosition({ lineNumber: first.line, column: first.column });
+            editor.focus();
         });
 
         this._okLabel = document.createElement("span");
@@ -666,8 +886,41 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             void this._editor.getAction("editor.action.formatDocument")?.run();
         });
 
-        this._status.append(this._languageLabel, this._problemButton, this._okLabel, this._schemaLabel, this._formatButton);
-        this._root.append(this._editorHost, this._status);
+        // 1.6.0: the diff and the preview take the editor's place in the same
+        // box, so the strip never moves.
+        this._diffHost = document.createElement("div");
+        this._diffHost.className = "CodeEditor-diff";
+        this._diffHost.hidden = true;
+
+        this._previewHost = document.createElement("div");
+        this._previewHost.className = "CodeEditor-preview";
+        this._previewHost.hidden = true;
+        // Scrollable by keyboard, and named, since it is a region of its own.
+        this._previewHost.tabIndex = 0;
+        this._previewHost.setAttribute("role", "region");
+
+        const modeButton = (onPress: () => void): HTMLButtonElement => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "CodeEditor-mode";
+            button.hidden = true;
+            button.addEventListener("click", onPress);
+            return button;
+        };
+        // A pressed button hides, so focus goes where the user is headed: to
+        // the button that comes back, or into the editor on the way back.
+        this._changesButton = modeButton(() => this.switchTo("changes", () => this._backButton.focus()));
+        this._backButton = modeButton(() => this.switchTo("edit", () => this._editor.focus()));
+        this._previewButton = modeButton(() => this.switchTo("preview", () => this._editButton.focus()));
+        this._editButton = modeButton(() => this.switchTo("edit", () => this._editor.focus()));
+
+        // The buttons sit together at the strip's right end, Format last.
+        const actions = document.createElement("span");
+        actions.className = "CodeEditor-actions";
+        actions.append(this._changesButton, this._backButton, this._previewButton, this._editButton, this._formatButton);
+
+        this._status.append(this._languageLabel, this._problemButton, this._okLabel, this._schemaLabel, actions);
+        this._root.append(this._editorHost, this._diffHost, this._previewHost, this._status);
         this._container.appendChild(this._root);
     }
 
@@ -717,16 +970,29 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._schemaLabel.title = this._schemaLabel.textContent;
         this._schemaLabel.classList.toggle("CodeEditor-schema--failed", !!schema?.failed);
 
-        // XML is formatted only when it is well-formed, so the button hides
-        // while validation is showing a fault; with validation off it shows,
-        // and a broken document is left as it is (formatXml declines).
-        const canFormat = !this._readOnly
-            && (this._language === "json" || (isXmlFamily(this._language) && !(validating && this._syntaxFault)));
-        this._formatButton.hidden = !canFormat;
-        if (canFormat) {
-            this._formatButton.textContent = this.text("Status_Format");
-            this._formatButton.title = this.text("Status_FormatHint");
-        }
+        // Which buttons this mode offers (strip.ts): Format as before, and
+        // 1.6.0's Changes, Preview and the two ways back.
+        const buttons = stripButtons({
+            mode: this._mode,
+            language: this._language,
+            readOnly: this._readOnly,
+            validating,
+            syntaxFault: this._syntaxFault,
+            differs: this._baseline.differs(this._editor?.getValue() ?? this._code ?? "")
+        });
+        const show = (button: HTMLButtonElement, on: boolean, label: string, hint: string | null): void => {
+            button.hidden = !on;
+            if (on) {
+                button.textContent = label;
+                button.title = hint ?? label;
+            }
+        };
+        show(this._formatButton, buttons.format, this.text("Status_Format"), this.text("Status_FormatHint"));
+        show(this._changesButton, buttons.changes, this.text("Status_Changes"), this.text("Status_ChangesHint"));
+        show(this._backButton, buttons.backToEditing, this.text("Status_BackToEditing"), null);
+        show(this._previewButton, buttons.preview, this.text("Status_Preview"), this.text("Status_PreviewHint"));
+        show(this._editButton, buttons.edit, this.text("Status_Edit"), null);
+        this._previewHost.setAttribute("aria-label", this.text("Status_Preview"));
     }
 
     /** The problem the strip names: the first error, else the first warning. */
@@ -804,6 +1070,22 @@ function clientUrl(context: ComponentFramework.Context<IInputs>): string | null 
     try {
         const page = (context as unknown as { page?: { getClientUrl?: () => string } }).page;
         return typeof page?.getClientUrl === "function" ? page.getClientUrl() : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The environment's origin, from its client URL: the only origin whose images
+ * the preview draws (previewPolicy.ts). Null without a URL — a canvas app, the
+ * hub's demo — where only `data:` images are drawn.
+ */
+function originOf(url: string | null): string | null {
+    if (!url) {
+        return null;
+    }
+    try {
+        return new URL(url).origin;
     } catch {
         return null;
     }

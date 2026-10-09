@@ -139,6 +139,7 @@
                     <option value="json">json</option>
                     <option value="xml">xml</option>
                     <option value="fetchxml">fetchxml</option>
+                    <option value="markdown">markdown</option>
                     <option value="javascript">javascript</option>
                     <option value="sql">sql</option>
                     <option value="plaintext">plaintext</option>
@@ -226,6 +227,15 @@
             </label>
 
             <label>
+                Open Markdown in
+                <select id="harness-markdown-view">
+                    <option value="">blank (edit)</option>
+                    <option value="edit">edit</option>
+                    <option value="preview">preview</option>
+                </select>
+            </label>
+
+            <label>
                 Strings
                 <select id="harness-strings">
                     <option value="1033">English (1033)</option>
@@ -248,6 +258,9 @@
             <button type="button" id="harness-fetchxml">Put FetchXML in the column</button>
             <button type="button" id="harness-fetchxml-faults">Put FetchXML with faults in the column</button>
             <button type="button" id="harness-break">Put a fault in the column</button>
+            <button type="button" id="harness-markdown">Put Markdown in the column</button>
+            <button type="button" id="harness-save">Save the record</button>
+            <button type="button" id="harness-script">A form script sets the column</button>
 
             <button type="button" id="harness-empty">Clear the column</button>
             <button type="button" id="harness-rerender">updateView again</button>

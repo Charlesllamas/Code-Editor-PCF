@@ -188,6 +188,42 @@
   <data name="Status_FormatHint" xml:space="preserve">
     <value>Formatear documento (Mayús+Alt+F)</value>
   </data>
+  <data name="Status_Changes" xml:space="preserve">
+    <value>Cambios</value>
+  </data>
+  <data name="Status_ChangesHint" xml:space="preserve">
+    <value>Mostrar lo que cambió desde la última vez que se guardó el registro</value>
+  </data>
+  <data name="Status_BackToEditing" xml:space="preserve">
+    <value>Volver a editar</value>
+  </data>
+  <data name="Status_Preview" xml:space="preserve">
+    <value>Vista previa</value>
+  </data>
+  <data name="Status_PreviewHint" xml:space="preserve">
+    <value>Mostrar el Markdown tal como se lee</value>
+  </data>
+  <data name="Status_Edit" xml:space="preserve">
+    <value>Editar</value>
+  </data>
+  <data name="Preview_Empty" xml:space="preserve">
+    <value>Todavía no hay nada que mostrar.</value>
+  </data>
+  <data name="Preview_ImageNotLoaded" xml:space="preserve">
+    <value>Una imagen de otro sitio, no cargada: {0}</value>
+  </data>
+  <data name="MarkdownView_Display_Key" xml:space="preserve">
+    <value>Abrir Markdown en</value>
+  </data>
+  <data name="MarkdownView_Desc_Key" xml:space="preserve">
+    <value>Si una columna Markdown se abre como texto para editar o con formato, tal como se lee. La barra inferior cambia entre las dos en ambos casos. Los demás lenguajes lo ignoran.</value>
+  </data>
+  <data name="MarkdownView_Edit_Key" xml:space="preserve">
+    <value>Edición</value>
+  </data>
+  <data name="MarkdownView_Preview_Key" xml:space="preserve">
+    <value>Vista previa</value>
+  </data>
   <data name="Schema_Display_Key" xml:space="preserve">
     <value>Esquema JSON</value>
   </data>

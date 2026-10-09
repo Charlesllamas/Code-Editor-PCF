@@ -665,6 +665,104 @@ section('echo.ts — the form\'s own change, or an echo of this control\'s write
     check('the list is bounded: a write sixteen back is still an echo, one older is the form\'s', [guard.takes('v24', 'v39'), guard.takes('v23', 'v39')], [false, true]);
 }
 
+/* ======================================================= 1.6.0: changes */
+
+const { Baseline, QUIET_MS } = load('baseline');
+
+section('baseline.ts — what Changes compares with: the value as last saved (SPEC.md, the 1.5.9 probe, P2)');
+
+{
+    // The passes as measured on the form, in order, with a clock.
+    const CODE = ['code', 'parameters'];
+    const b = new Baseline(null);
+    check('a null column mounts as an empty baseline, with nothing to show', [b.get(), b.differs('')], ['', false]);
+
+    b.wrote(1000); // "abc" typed
+    check('typing makes the document differ', b.differs('abc'), true);
+    check('the echo — one pass, the value just written, 300 ms later — is not a save', b.pass('abc', 'abc', CODE, 1300), false);
+    check('a pass that does not name the column — a resize — is never a save', b.pass('abc', 'abc', ['layout'], 9000), false);
+    check('…nor one naming nothing, as the harness and the hub demo hand down', b.pass('abc', 'abc', [], 9000), false);
+    // Save pressed at 19 s; its burst 0.88, 1.05 and 1.15 s later.
+    check('a save: the column named, the value the editor holds, nothing written for a second', b.pass('abc', 'abc', CODE, 19880), true);
+    check('…and the document no longer differs', [b.get(), b.differs('abc')], ['abc', false]);
+    check('the burst\'s second and third passes change nothing more', [b.pass('abc', 'abc', CODE, 20050), b.pass('abc', 'abc', CODE, 20150)], [false, false]);
+    check('with no form (canvas, the demo) a value the editor took is the new starting point', (() => {
+        const c = new Baseline('first record');
+        c.took('second record');
+        return [c.get(), c.differs('second record')];
+    })(), ['second record', false]);
+    check('a save pressed straight after typing is caught by the burst\'s later passes', (() => {
+        const c = new Baseline('');
+        c.wrote(5000);  // the last keystroke, then Save at once
+        return [c.pass('ab', 'ab', CODE, 5000 + 880), c.pass('ab', 'ab', CODE, 5000 + 1050), c.get()];
+    })(), [false, true, 'ab']);
+
+    b.wrote(5000); // "abcdef"
+    check('a script\'s setValue — one pass with a new value — is not a save: it stays in the diff', b.pass('<fetch/>', 'abcdef', CODE, 9000), false);
+    check('an auto-save 30 s later, repeating what the editor holds, is', b.pass('abcdef', 'abcdef', CODE, 35200), true);
+    check('a save pressed within a second of the last keystroke leaves the baseline (it catches up at the next)', (() => {
+        const c = new Baseline('x');
+        c.wrote(100);
+        return [c.pass('xy', 'xy', CODE, 100 + QUIET_MS - 1), c.get()];
+    })(), [false, 'x']);
+}
+
+const { linkTarget, imageSource, rewriteImageToken, markedIndex, IMAGE_MARK, PLACEHOLDER, MEDIA_TAGS } = load('previewPolicy');
+
+section('previewPolicy.ts — what the preview opens, and which images it draws (P3, P4)');
+
+{
+    check('links open over http and https only, absolute', [linkTarget('https://example.com/a'), linkTarget('http://example.com/'), linkTarget(' https://x.org ')], ['https://example.com/a', 'http://example.com/', 'https://x.org/']);
+    check('…not mailto: (nothing happened through openUrl on the form), javascript:, data: or a relative path', [linkTarget('mailto:a@b.c'), linkTarget('javascript:alert(1)'), linkTarget('data:text/html,x'), linkTarget('/main.aspx'), linkTarget(null)], [null, null, null, null, null]);
+
+    const ORG = 'https://org.crm.dynamics.com';
+    check('an image from the environment is drawn, relative or absolute', [imageSource('/WebResources/x.png', ORG), imageSource('https://org.crm.dynamics.com/WebResources/x.png', ORG)], ['https://org.crm.dynamics.com/WebResources/x.png', 'https://org.crm.dynamics.com/WebResources/x.png']);
+    check('…one from anywhere else is not — not a look-alike host either', [imageSource('https://example.com/x.png', ORG), imageSource('https://org.crm.dynamics.com.evil.test/x.png', ORG), imageSource('//example.com/x.png', ORG)], [null, null, null]);
+    check('a data: image is drawn: it contacts nobody', imageSource('data:image/png;base64,AAAA', ORG), 'data:image/png;base64,AAAA');
+    check('…but not data: that is not an image', imageSource('data:text/html,<b>', ORG), null);
+    check('with no environment (canvas, the hub demo) only data: images are drawn', [imageSource('/x.png', null), imageSource('data:image/gif;base64,R0', null)], [null, 'data:image/gif;base64,R0']);
+    check('media are out of the sanitiser\'s list, so raw HTML never fetches', ['img', 'video', 'audio', 'source', 'picture', 'track'].every((t) => MEDIA_TAGS.includes(t)), true);
+
+    const drawn = [];
+    const refused = (url) => 'not loaded: ' + url;
+    const allowedImage = { type: 'image', href: '/WebResources/logo.png', title: 'Logo', text: 'the &lt;logo&gt;' };
+    rewriteImageToken(allowedImage, ORG, drawn, refused);
+    check('an allowed image becomes a link to a placeholder, marked with its index, its source kept', [allowedImage.type, allowedImage.href, markedIndex(allowedImage.title), drawn], ['link', PLACEHOLDER + '0', 0, [{ src: ORG + '/WebResources/logo.png', alt: 'the &lt;logo&gt;', title: 'Logo' }]]);
+    check('…its alt text an escaped text token: the lexer escaped it already', allowedImage.tokens, [{ type: 'text', raw: 'the &lt;logo&gt;', text: 'the &lt;logo&gt;', escaped: true }]);
+
+    const remote = { type: 'image', href: 'https://example.com/pixel.png', title: null, text: 'pixel' };
+    rewriteImageToken(remote, ORG, drawn, refused);
+    check('a refused image stays a link to its URL, says why, and is not drawn', [remote.type, remote.href, remote.title, markedIndex(remote.title), drawn.length], ['link', 'https://example.com/pixel.png', 'not loaded: https://example.com/pixel.png', null, 1]);
+
+    const link = { type: 'link', href: 'https://example.com', title: IMAGE_MARK + '0' };
+    rewriteImageToken(link, ORG, drawn, refused);
+    check('a token that is not an image is left as it is', [link.href, drawn.length], ['https://example.com', 1]);
+    check('a title is marked only by the mark: an ordinary title, or the mark with no index, is not', [markedIndex('0'), markedIndex(IMAGE_MARK), markedIndex(IMAGE_MARK + 'x'), markedIndex(null)], [null, null, null, null]);
+}
+
+const { stripButtons, initialMode, settleMode, readMarkdownView } = load('strip');
+
+section('strip.ts — the three modes, and the buttons each offers');
+
+{
+    const base = { mode: 'edit', language: 'json', readOnly: false, validating: true, syntaxFault: false, differs: false };
+    const on = (s) => Object.keys(stripButtons(s)).filter((k) => stripButtons(s)[k]);
+    check('editing JSON, unchanged: Format alone, as in 1.5', on(base), ['format']);
+    check('…changed since the save: Changes beside it', on({ ...base, differs: true }), ['format', 'changes']);
+    check('…read-only: nothing to format and no changes of the user\'s to show', on({ ...base, differs: true, readOnly: true }), []);
+    check('XML with a fault under validation: no Format, as before', on({ ...base, language: 'xml', syntaxFault: true }), []);
+    check('Markdown: Preview, and no Format', on({ ...base, language: 'markdown', differs: true }), ['changes', 'preview']);
+    check('…read-only Markdown can still be previewed', on({ ...base, language: 'markdown', readOnly: true }), ['preview']);
+    check('in Changes: only the way back', on({ ...base, mode: 'changes', differs: true }), ['backToEditing']);
+    check('in the preview: only Edit', on({ ...base, language: 'markdown', mode: 'preview' }), ['edit']);
+
+    check('markdownView: preview, case and spaces forgiven; anything else is edit', [readMarkdownView('preview'), readMarkdownView(' Preview '), readMarkdownView('edit'), readMarkdownView(undefined), readMarkdownView(7)], ['preview', 'preview', 'edit', 'edit', 'edit']);
+    check('a Markdown editor set to preview mounts in the preview; any other language ignores it', [initialMode('preview', 'markdown'), initialMode('preview', 'json'), initialMode('edit', 'markdown')], ['preview', 'edit', 'edit']);
+    check('the preview leaves when the language stops being Markdown', settleMode('preview', 'json', false), 'edit');
+    check('Changes leaves when the field turns read-only', settleMode('changes', 'json', true), 'edit');
+    check('…and both stay otherwise', [settleMode('preview', 'markdown', true), settleMode('changes', 'json', false)], ['preview', 'changes']);
+}
+
 /* ============================================================ page theme */
 
 const { pageTheme } = load('theme');

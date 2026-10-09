@@ -173,6 +173,45 @@
     /** The platform's copy of the column, which is not the control's copy. */
     var columnValue = SAMPLE;
 
+    /** What the preview asked `navigation.openUrl` to open. */
+    var openedUrls = [];
+    window.__harnessOpenedUrls = openedUrls;
+
+    /*
+     * 1.6.0's preview: every block it renders, an image from this origin
+     * (drawn), one from another site (a link, never fetched), a data: one
+     * (drawn), a link of each kind, and HTML that must not survive.
+     */
+    var MARKDOWN = [
+        '# Release checklist',
+        '',
+        'Read **before** tagging. See the [hub](https://pcfhub.dev) and `npm run release`.',
+        '',
+        '- [x] Bump the version',
+        '- [ ] Write the notes',
+        '',
+        '| Step | Owner |',
+        '|------|-------|',
+        '| Pack | CI    |',
+        '',
+        '> A bare tag publishes one compare link.',
+        '',
+        '```',
+        'git tag -a --cleanup=verbatim v1.6.0 -F .release-notes.md',
+        '```',
+        '',
+        'Logo from this environment: ![the logo](/media/logo.png "PCFHub")',
+        '',
+        'Pixel from another site: ![a tracking pixel](https://example.com/pixel.png)',
+        '',
+        'Inline data: ![a dot](data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7)',
+        '',
+        'Mail [someone](mailto:someone@example.com), or run [this](javascript:alert(1)).',
+        '',
+        '<details><summary>HTML that survives</summary>A <kbd>Ctrl</kbd>+<kbd>S</kbd> and <sub>a sub</sub>.</details>',
+        '<img src="https://example.com/raw.png" onerror="alert(1)"><script>alert(2)</script>',
+    ].join('\n');
+
     /*
      * **Two arguments, not three.** `pcf-scripts` emits
      * `registerControl('Namespace.Control', ctor)` — the namespace and the
@@ -202,10 +241,12 @@
             validation: document.getElementById('harness-validation').value,
             schema: document.getElementById('harness-schema').value,
             metadata: document.getElementById('harness-metadata').value,
+            markdownView: document.getElementById('harness-markdown-view').value,
         };
     }
 
-    function buildContext(o) {
+    /** `updated` is the pass's `updatedProperties`; a plain re-render names nothing. */
+    function buildContext(o, updated) {
         return {
             parameters: {
                 code: {
@@ -219,6 +260,21 @@
                 fitContent: { raw: o.fitContent, type: 'TwoOptions' },
                 validation: { raw: o.validation, type: 'Enum' },
                 schema: { raw: SCHEMAS[o.schema].raw, type: 'SingleLine.Text' },
+                // Blank is the property left unset: null, which is how the
+                // platform hands down an Enum nobody chose (the default applies).
+                markdownView: { raw: o.markdownView === '' ? null : o.markdownView, type: 'Enum' },
+            },
+
+            /*
+             * The one navigation method the preview uses. Logged, not
+             * followed: the harness page should stay where it is. The form
+             * opened https in a new tab (SPEC.md, the 1.5.9 probe, P4).
+             */
+            navigation: {
+                openUrl: function (url) {
+                    openedUrls.push(url);
+                    document.getElementById('harness-status').textContent = 'navigation.openUrl(' + url + ')';
+                },
             },
 
             /*
@@ -276,7 +332,7 @@
             // The strings switch is the user's language, as on a form.
             userSettings: { isRTL: false, languageId: Number(document.getElementById('harness-strings').value) || 1033 },
 
-            updatedProperties: [],
+            updatedProperties: updated || [],
         };
     }
 
@@ -374,9 +430,27 @@
         showOutputs();
     }
 
-    function rerender() {
-        instance.updateView(buildContext(options()));
+    function rerender(updated) {
+        instance.updateView(buildContext(options(), Array.isArray(updated) ? updated : undefined));
         showOutputs();
+    }
+
+    /*
+     * What a model-driven form does when the record is saved, as measured
+     * (SPEC.md, the 1.5.9 probe, P2): three passes naming the column, 0.88,
+     * 1.05 and 1.15 s after the press, each carrying the value the editor
+     * already holds.
+     */
+    function save() {
+        [880, 1050, 1150].forEach(function (ms) {
+            window.setTimeout(function () { rerender(['code', 'parameters']); }, ms);
+        });
+    }
+
+    // A form script's setValue: one pass, 20 ms later, carrying a new value.
+    function script() {
+        columnValue = '{\n  "setBy": "a form script",\n  "at": "' + new Date().toISOString() + '"\n}';
+        window.setTimeout(function () { rerender(['code', 'parameters']); }, 20);
     }
 
     window.__harnessStart = function () {
@@ -459,6 +533,18 @@
         // The cheapest way to catch work that belongs behind a comparison:
         // press it and watch whether the editor loses what was typed.
         document.getElementById('harness-rerender').addEventListener('click', rerender);
+
+        // 1.6.0. The Markdown sample switches the language too, so the
+        // preview has something to render.
+        document.getElementById('harness-markdown').addEventListener('click', function () {
+            columnValue = MARKDOWN;
+            document.getElementById('harness-language').value = 'markdown';
+            mount();
+        });
+        document.getElementById('harness-save').addEventListener('click', save);
+        document.getElementById('harness-script').addEventListener('click', script);
+        // On the mounted control, as the hub's demo switches a preset.
+        document.getElementById('harness-markdown-view').addEventListener('change', rerender);
 
         status.textContent = 'Registered the control.';
 
