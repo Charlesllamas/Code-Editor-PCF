@@ -1,0 +1,8 @@
+# Every text file is checked out with LF endings, whatever core.autocrlf says
+# on the machine doing the checkout. Git stores LF either way; without this
+# file a Windows working tree mixed the two across copies of the same file, so
+# a byte comparison of a repository's shared scripts with the template's
+# reported drift where no line differed (release.mjs in 27 of 31 repositories,
+# 2026-10-09), and four scripts had each grown their own normalisation.
+# Binary files are detected and left as they are.
+* text=auto eol=lf
