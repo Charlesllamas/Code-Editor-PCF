@@ -964,11 +964,55 @@ binding through a reload; dropping the `fast-block` cache's
 No error in the console came from the control. Not walked on the form: the
 Spanish strings (read in the harness), the phone, canvas.
 
+## The 1.6.0 canvas walkthrough (cll365, a new blank tablet app, 2026-10-09)
+
+A blank app made in Studio, never saved: the Code Editor from *Get more
+components → Code* (the 1.6.0 import), 1000 × 560, `language` markdown,
+**Open Markdown in** Preview, `code` = `varDoc`; a **Sample** button sets
+`varDoc` to the hostile sample (a link, a remote, a relative and a `data:`
+image, a raw `<img onerror>`, a `<script>`, `javascript:` and `mailto:`
+links, a task list, a table), **Other** to a two-line document; a label
+shows `Len(code)`, `isValid` and `problemCount`. Driven in Play.
+
+- **C1 — `context.page` is there and `getClientUrl` throws** — Studio's
+  banner: *getClientUrl: Method not implemented.* — so the origin is null and
+  the canvas rules apply: only `data:` images, and a value the app hands in
+  is the new baseline. This settles the 1.4.9 probe's P6 first half.
+- **C2 — opens rendered.** *Nothing to preview yet.* before a value, then
+  the sample rendered on **Sample**: heading, link, bold, code, the task
+  list (checkboxes disabled), the table; the `data:` image drawn; the remote
+  image a link, the relative one its alt text (no origin to allow it);
+  `<img>`, `<script>` and both refused links gone or plain text. The
+  control's frame is another origin, so the pane could not list its
+  requests; the remote image never reached the renderer as an `<img>`.
+- **C3 — Changes.** Edit, ` edited` typed on line 1: **Changes** beside Preview.
+  Pressed: side by side (the box is 1000 px), the insertion marked, against
+  the **Sample** value — the app's last value, not the one before it
+  (`Baseline.took`). Typing in the modified side marked a second line.
+- **C4 — a value from the app while the diff is open** (**Other**): the
+  editor took it, both sides the new document, nothing marked. The typed
+  edits went, as a gallery moving would replace them.
+- **C5 — a link** pressed in the preview asked for a new tab to
+  `pcfhub.dev` (the pane blocks tabs it did not open, and said so); the app
+  did not reload.
+- **C6 — `isValid` reads false until the first keystroke.** With the sample
+  in and nothing wrong — Markdown is not checked — the label said
+  `isValid false | problems 0`; one keystroke turned it `true`. The verdict
+  starts at `{ true, 0 }` and is handed over only when it changes, so a
+  value from the host never reports it, and the canvas default (false)
+  stands. **A Save button gated on `isValid` is disabled until the user
+  types.** Not new in 1.6.0 — 1.3.0 started the verdict the same way — and
+  it answers the 1.3.0 item below. The fix is to report the verdict once
+  even when it has not changed.
+
+No console error came from the control: Monaco's worker fallback and this
+control's own warning, once each. Not walked: dark theme, the phone (Studio's
+phone preview scales the tablet screen), Spanish.
+
 ## Not verified
 
 From the 1.5.9 probe:
 
-- **Canvas** (P5): the diff and the renderer in the canvas test app.
 - **`mailto:` through `openUrl` in a browser with a mail handler.** The
   built-in browser showed nothing; 1.6.0 leaves `mailto:` out rather than
   ship a link that may do nothing.
@@ -989,9 +1033,10 @@ From the 1.4.9 probe:
 
 - **A user without customizer rights** reading the table definitions (P7);
   every answer above is the System Administrator's.
-- **Canvas** (P6): what `context.page` is there, and what a root-relative
-  `/api/data` request answers. W11 showed the control makes no request there,
-  which is what the docs promise; the shape behind it is still unread.
+- **Canvas** (P6): what a root-relative `/api/data` request answers there.
+  W11 showed the control makes no request there, which is what the docs
+  promise. `context.page` is there and `getClientUrl` throws (the 1.6.0
+  canvas walkthrough, C1).
 
 From 1.4.0:
 
@@ -1006,7 +1051,8 @@ From 1.4.0:
 From 1.3.0:
 
 - **The outputs in a canvas app**: `isValid` driving a Save button's
-  `DisplayMode`, including before the user types.
+  `DisplayMode` after the user types. Before it, `isValid` reads false
+  (the 1.6.0 canvas walkthrough, C6).
 
 From the 1.2.9 probe:
 
