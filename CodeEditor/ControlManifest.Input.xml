@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="PCF" constructor="CodeEditor" version="1.5.9" display-name-key="Code_Editor_Name_Key" description-key="Code_Editor_Desc_Key" control-type="standard" >
+  <control namespace="PCF" constructor="CodeEditor" version="1.6.0" display-name-key="Code_Editor_Name_Key" description-key="Code_Editor_Desc_Key" control-type="standard" >
     <!--external-service-usage node declares whether this 3rd party PCF control is using external service or not, if yes, this control will be considered as premium and please also add the external domain it is using.
     If it is not using any external service, please set the enabled="false" and DO NOT add any domain below. The "enabled" will be false by default.
     Example1:
@@ -65,6 +65,16 @@
       No default: blank is 1.2.0's behaviour.
     -->
     <property name="schema" display-name-key="Schema_Display_Key" description-key="Schema_Desc_Key" of-type="SingleLine.Text" usage="input" required="false" />
+
+    <!--
+      1.6.0: how a Markdown column opens — as text to edit, or rendered. The
+      strip switches between the two either way. An Enum defaulting to edit,
+      so a form that had 1.5 opens as it did; any other language ignores it.
+    -->
+    <property name="markdownView" display-name-key="MarkdownView_Display_Key" description-key="MarkdownView_Desc_Key" of-type="Enum" usage="input" required="false" default-value="edit">
+      <value name="edit" display-name-key="MarkdownView_Edit_Key">edit</value>
+      <value name="preview" display-name-key="MarkdownView_Preview_Key">preview</value>
+    </property>
 
     <!--
       The control's own verdict, for a canvas app to act on — a Save button's
