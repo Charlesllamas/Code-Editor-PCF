@@ -885,6 +885,77 @@ Both records' `cll_code` and `cll_editor2` were null again at the end.
   `typeof`, never a key list.
 - **P5 — canvas: not run.** Goes to *Not verified*.
 
+## What building 1.6.0 found
+
+- **The bundle grew 8,114 bytes** (4,365,402 → 4,373,516 packed): the diff
+  editor and the Markdown renderer were already in it, as the probe's
+  12.6 kB build suggested.
+- **The diff editor's construction options take no suggestion settings**
+  (`wordBasedSuggestions`, `quickSuggestions`, `suggest`,
+  `acceptSuggestionOnEnter` are a type error there); they are set on its
+  modified editor after creation. Its overview ruler is a grey band as wide as
+  two characters — heavy on a form field, so it is off.
+- **Disposing the diff editor leaves the models alone** (harness: the editor's
+  model was live after *Back to editing*), so the baseline model is disposed
+  by hand and the editor's own is not.
+- **`Number("")` is 0**, so a title holding the bare image mark read as index
+  0; the suite caught it, and `markedIndex` takes digits only.
+- **A host with no form needs another baseline rule.** In a canvas app and on
+  the hub's demo a new value from the host is the saved value — a gallery
+  moving, a preset switching — so with no client URL a value the editor takes
+  is the new starting point (`Baseline.took`). On a form the same pass is a
+  script's, unsaved.
+- **The platform gives the control's container the class `CodeEditor`** too
+  (`customControl PCF CodeEditor PCF.CodeEditor`), so a `.CodeEditor` query
+  on the form matches the container and the root inside it: one instance
+  looked like two. The stylesheet's `.CodeEditor` rules have always reached
+  the container as well; select the root as `div.CodeEditor:not(.customControl)`
+  when counting.
+- **A background pane keeps Monaco's focus flag stale** (`hasTextFocus()` true
+  with `<body>` active), so the echo guard's focus check refused a script's
+  value in the harness. Not a control fault — a fresh mount that never took
+  focus behaved — but worth knowing before reading a harness result.
+
+## The 1.6.0 walkthrough (cll365, account Information form, 2026-10-09)
+
+Imported with `pac solution import --publish-changes` over 1.5.9; the form ran
+the packed bundle, 4,373,516 bytes. A second Code Editor was bound to
+`cll_editor2` ("editor 2", same tab) with `ppdev form control bind`
+(`language` markdown, `markdownView` preview) for the preview, and unbound
+afterwards; *Probe empty*'s two columns were set through the Web API and
+cleared at the end. The form definition the app had cached kept the old
+binding through a reload; dropping the `fast-block` cache's
+`account-mainForm` entry and reloading picked the new one up.
+
+**All seven the right way.**
+
+- **W1 — opens rendered.** The Markdown column opened in the preview with
+  **Edit** alone in the strip; the web resource `msfp_FormsProIcon.png` drawn
+  (32 px, its absolute address); the remote image a link titled *An image
+  from another site, not loaded*; nothing requested from `example.com`; the
+  raw `<img>`, the `<script>` and the `onerror` gone, and nothing ran;
+  `mailto:` its text. Task lists without bullets, the table, `<details>`
+  rendered.
+- **W2 — Edit and Preview** switch both ways, focus into the editor on Edit,
+  and the form stays *Saved*.
+- **W3 — Changes, through a save.** Typed `<fetch/>` with real keys: the form
+  *Unsaved* and **Changes** beside Format. Pressed: the diff side by side
+  (1111 px wide, past the 900 px breakpoint), the insertion marked, focus on
+  **Back to editing**. Saved (Save, then duplicate detection's *Ignore And
+  Save* banner): both sides `<fetch/>`, nothing marked.
+- **W4 — a script's value stays a change.** `setValue('<fetch top="1"/>')`
+  with focus elsewhere: the editor took it and **Changes** appeared, the form
+  *Unsaved*.
+- **W5 — the auto-save clears it**, 31 s later.
+- **W6 — read-only.** `setDisabled(true)` on both: the FetchXML strip offers
+  nothing, the preview keeps **Edit**; re-enabled, **Changes** is back.
+- **W7 — a link** pressed in the preview asked for a new tab to
+  `pcfhub.dev` (the built-in browser blocks tabs it did not open, and said
+  so); the form did not reload.
+
+No error in the console came from the control. Not walked on the form: the
+Spanish strings (read in the harness), the phone, canvas.
+
 ## Not verified
 
 From the 1.5.9 probe:
