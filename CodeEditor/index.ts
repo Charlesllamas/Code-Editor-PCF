@@ -18,6 +18,8 @@ import { Baseline } from "./baseline";
 import { Verdict } from "./verdict";
 import { MarkdownView, Mode, initialMode, readMarkdownView, settleMode, stripButtons } from "./strip";
 import { renderPreview } from "./preview";
+// THROWAWAY: the 1.6.9 probe (SPEC.md). Remove with probe.ts before 1.7.0.
+import * as probe from "./probe";
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -125,6 +127,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
         this._container = container;
         this._context = context;
+        probe.see(context, "init", container); // THROWAWAY (probe)
         this._notifyOutputChanged = notifyOutputChanged;
         this._getString = (key) => context.resources.getString(key);
 
@@ -218,6 +221,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      * Called when any value in the property bag has changed.
      */
     public updateView(context: ComponentFramework.Context<IInputs>): void {
+        probe.see(context, "update"); // THROWAWAY (probe)
         this._context = context;
         const previouslyValidating = this._validate;
         this.readInputs(context);
@@ -315,6 +319,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
      * Called when the control is to be removed from the DOM tree.
      */
     public destroy(): void {
+        probe.see(undefined, "destroy"); // THROWAWAY (probe)
         this.closeChanges();
         this.closePreview();
         this._schemaToken++;

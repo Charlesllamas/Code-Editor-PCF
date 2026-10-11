@@ -1036,6 +1036,64 @@ packed bundle 4,373,688 bytes (+172).
   *Saved* with `getIsDirty()` false. Reporting the verdict at mount hands the
   form the value it already has, and the form does not take it as an edit.
 
+## The 1.6.9 probe — asked before 1.7.0 is written
+
+1.7.0 adds a JSON tree, decided with the user on 2026-10-11:
+
+- **Its own view, like Preview.** A **Tree** button in the strip on a JSON
+  document swaps the editor for a read-only tree; **Edit** swaps back. The
+  tree opens on the node under the cursor, and Enter or a double-click on a
+  node returns to the editor with that node's text selected. JSON only — XML
+  and FetchXML get no tree.
+- **A new optional property, `jsonView`** ("Open JSON in", `edit` | `tree`,
+  default `edit`, so a 1.6 form is unchanged).
+- **The keyboard is the WAI-ARIA tree's**: arrows, Home/End, Enter, `*`,
+  type-ahead, Ctrl+C for the node's path (`$.items[2].name`).
+
+It reuses what the bundle carries: jsonc-parser's `parseTree` gives every
+node its offset, and `schemaNav.ts` gives a node's description from the
+schema.
+
+`probe.ts` parks `window.__pcfCodeEditorProbe`; it changes nothing on the
+record. **A wrong answer removes the feature it names.**
+
+| # | Ask | Cuts |
+|---|---|---|
+| P1 | **Size.** `p.size()`: a generated ~1.1 MB JSON document (a Multiple Lines column holds 1,048,576 characters), parsed with `parseTree`, walked into rows as an expand-all would show them, and 500, 2,000, 10,000 and every row drawn off-screen as the tree would draw them, with layout read back. | **Windowing.** Over about 100 ms for 10,000 rows, the tree draws a window of fixed-height rows and focus is `aria-activedescendant` (a roving tab stop cannot live on a row that is not drawn). Under it, every expanded row is drawn |
+| P2 | **Which keys reach the control.** `p.keys()` mounts a focusable `role="tree"` box at the top of the control. With it focused, the user presses ↑ ↓ ← → Home End Enter Space `*` a Ctrl+C F2 Escape. Per key: whether it reached the window's capture phase, the box, and the window's bubble phase; whether anything prevented it; where focus went; any scroll. The box prevents the default of the keys the tree will claim, as the tree will | Any key the host takes before the control, or acts on as well, leaves the key map and is named in `docs/limitations.md` |
+| P3 | **Which clipboard path works.** The bar's buttons copy three ways — `navigator.clipboard.writeText`, `execCommand('copy')` on an off-screen textarea, and 1.7.0's (the API, then `execCommand` when it is refused) — and Ctrl+C on the box copies the third way from inside the keydown. Each records its result; the user pastes to see what landed. `pcf-copy-field` left this *Not verified* | **Copy path.** If neither path writes in a host, the button is hidden there and the path stays as selectable text in the strip |
+| P4 | **Canvas** (not blocking): P2 and P3 in a canvas app, through the console's frame selector | Goes to *Not verified* |
+
+**Steps, on the account Information form** with the 1.6.9 zip imported over
+1.6.1 and a Code Editor on the form:
+
+1. Hard reload the record. In the console:
+   `const p = window.__pcfCodeEditorProbe`, then `p.size()`.
+2. `p.keys()`. Click the dashed box at the top of the editor, press
+   ↑ ↓ ← → Home End Enter Space `*` a Ctrl+C F2 Escape, one at a time.
+3. Press **Copy (API)**, **Copy (execCommand)** and **Copy as 1.7.0 would**;
+   after each, paste (Ctrl+V) into Notepad and say what landed.
+4. `copy(p.all())` and paste the result.
+
+### Answers from the harness (localhost, the desktop app's Chromium 152, 2026-10-11)
+
+- **P1 — windowing is needed.** 1,117,884 characters, 43,206 rows, six
+  levels deep. `parseTree` 18–22 ms, the walk into rows 5–8 ms. Drawn and
+  laid out: 500 rows 8–11 ms, 2,000 29–33 ms, **10,000 132–135 ms**, all
+  43,206 590–658 ms. Over the line on a 16-core desktop; a form on a
+  lesser machine is slower, not faster.
+- **P2 — every key reached the box and bubbled back to the window**, focus
+  stayed on it, nothing scrolled. `defaultPrevented` at the end was true for
+  exactly the keys the box prevents and Ctrl+C, false for `a`, F2 and
+  Escape — the harness has no handler of its own. (The pane's own key sender
+  delivers `*` with an empty `key`; `dev/keys.js` presses it as a browser
+  does.)
+- **P3 — the API was refused, the fallback wrote.** Ctrl+C in the keydown:
+  `writeText` threw *NotAllowedError: Write permission denied*, and
+  `execCommand('copy')` returned true. The harness page is not framed and
+  is a secure context, so the refusal is the browser's permission, not a
+  frame's policy — a two-path copy is the normal case even outside a form.
+
 ## Not verified
 
 From the 1.5.9 probe:
