@@ -1094,6 +1094,43 @@ record. **A wrong answer removes the feature it names.**
   is a secure context, so the refusal is the browser's permission, not a
   frame's policy — a two-path copy is the normal case even outside a form.
 
+### Answers on the form (the test environment, account Information form, Grid tab, 2026-10-11)
+
+Imported with `pac solution import --publish-changes` over 1.6.1 (139 s);
+packed bundle 4,384,621 bytes; `customcontrols` read back 1.6.9. Driven in
+the desktop app's browser pane (Chromium 152), signed in as the system
+administrator; keys and clicks were real input to the page, not dispatched
+events.
+
+- **The control is not framed on a form.** `window !== window.top` is false:
+  a standard control renders in the form's own document. (`pcf-copy-field`'s
+  SPEC reasoned that a form hosts a control in an iframe; on this form it
+  does not.)
+- **P1 — windowing stays.** Same document as the harness: `parseTree` 16–22
+  ms, the walk 4–6 ms; drawn and laid out, 500 rows 12–15 ms, 2,000 36–40
+  ms, **10,000 167–177 ms**, all 43,206 765–901 ms — about a third slower
+  than the bare harness, the form's own stylesheet and DOM around it. The
+  tree draws a window of fixed-height rows, and focus is
+  `aria-activedescendant` on the tree itself.
+- **P2 — the form takes no key from the control.** All thirteen presses
+  reached the window's capture phase, then the box, then the window's bubble
+  phase. None arrived prevented; at the end exactly the keys the box
+  prevents (and Ctrl+C) were prevented, and `a`, F2 and Escape were not —
+  nobody else prevented anything. Focus stayed on the box after every key,
+  nothing scrolled, no dialog opened, the URL did not change, and the record
+  stayed *Saved* (`getIsDirty()` false). Escape and F2 do nothing on a form,
+  so the key map keeps its full set. (The pane sends Shift+8 as `8` and its
+  own `*` with an empty `key`; a real `*` is pressed through `dev/keys.js`.)
+- **P3 — the API refused, `execCommand` wrote, every time.** The three
+  buttons and Ctrl+C in the keydown: `writeText` threw *NotAllowedError:
+  Write permission denied* four times, and `execCommand('copy')` returned
+  true four times; the pane reported each write reaching the operating
+  system's clipboard. `env()`: `clipboard-write` allowed by policy, a secure
+  context — so the refusal is this browser's permission, and a desktop Edge
+  or Chrome may well take the API. **Copy path ships**, on the two-path
+  copy, and the focus goes back to the tree after the scratch textarea.
+- **P4 — canvas, not asked.** Left for the 1.7.0 canvas walkthrough.
+
 ## Not verified
 
 From the 1.5.9 probe:
