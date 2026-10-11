@@ -230,6 +230,25 @@ a record opens tells whoever hosts it who opened the record and when.
   upgrade re-checks it before release.
 - **Code blocks are not coloured** in the preview; they are shown as written.
 
+## The tree is JSON's, and only shows
+
+From 1.7.0, a JSON column can be browsed as a tree. What it does not do:
+
+- **XML and FetchXML get no tree.** Only JSON.
+- **It does not edit.** Every change is made in the editor; Enter on a node
+  takes you there with its text selected.
+- **No tree while the JSON has a fault**, and it is strict about what a fault
+  is: a comment or a trailing comma is one, as validation says. The fault is
+  named where the tree would be, with a way to it.
+- **No search.** Typing finds a node by its *name* among the rows on show;
+  it does not look inside values or closed nodes.
+- **What the strip says about a node is plain text** — the schema's
+  `description`, else its `title`. A `markdownDescription` is not rendered
+  there (the hover in the editor shows it).
+- **Copy path needs a browser that lets a page write the clipboard.** It tries
+  the Clipboard API and then the older copy command; if both are refused, the
+  strip says so, and the path is there to select and copy.
+
 ## It cannot block a save on a form
 
 The Power Apps component framework does not let a control cancel a save, so on
@@ -264,6 +283,11 @@ Monaco handles megabyte files comfortably; the platform around it does not. A
 model-driven form round-trips the whole column value on every save, and a
 Multiple Lines of Text column is capped at 1,048,576 characters. Documents in
 the hundreds of kilobytes are usable but noticeably slower to save.
+
+The tree is not what slows: it reads the whole document when it opens —
+about a tenth of a second for a megabyte in the harness — and after that draws
+only the rows in view, so moving through forty thousand rows costs what
+moving through forty does.
 
 ## Keyboard shortcuts are captured while focused
 

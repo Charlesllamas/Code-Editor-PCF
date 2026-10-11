@@ -97,6 +97,15 @@ address for your environment's Web API, so the table definitions those names
 come from cannot be read, and none is attempted. On a model-driven form they
 are — see [Model-driven apps](model-driven).
 
+## The JSON tree in a canvas app
+
+From 1.7.0, set the control's `jsonView` property to `"tree"` to open a JSON
+value as a tree; `"edit"`, or leaving it blank, opens it as text. **Tree** and
+**Edit** in the strip switch either way. Everything under *JSON tree* in
+[Model-driven apps](model-driven) holds here, except that there is no
+environment to read a schema web resource from: pass the schema inline for
+the strip to show its descriptions.
+
 ## Other rough edges
 
 - The editor fills the box you give it. A short box gets a short editor with its

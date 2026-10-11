@@ -102,9 +102,33 @@
                 control.setMode('changes');
             }
 
+            /*
+             * 1.7.0: an order the schema passes, opened in the tree; the
+             * keys walk into the first line so the strip shows a path and
+             * the schema's word for it.
+             */
+            var TREE_ORDER = JSON.stringify({
+                id: 1042,
+                lines: [{ sku: 'PCF-001', qty: 2 }, { sku: 'PCF-002', qty: 1 }, { sku: 'PCF-007', qty: 12 }],
+                status: 'open',
+                shipped: false,
+                notes: null
+            }, null, 2);
+            function walkTree(keys) {
+                return function () {
+                    var view = document.querySelector('.CodeEditor-tree-view');
+                    view.focus();
+                    keys.forEach(function (key) {
+                        view.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true }));
+                    });
+                };
+            }
+
             /* Each state: the column, the inputs, and the app theme. */
             var STATES = {
                 markdown: { code: MARKDOWN, language: 'markdown', theme: 'auto', height: 360, fit: false, dark: false, markdownView: 'preview' },
+                tree: { code: TREE_ORDER, language: 'json', theme: 'auto', height: 300, fit: false, dark: false, schema: ORDER_SCHEMA, jsonView: 'tree', after: walkTree(['ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowDown']) },
+                'tree-dark': { code: CONFIG, language: 'json', theme: 'dark', height: 260, fit: false, dark: true, jsonView: 'tree', after: walkTree(['ArrowDown', 'ArrowDown', 'ArrowRight', 'ArrowRight', '*', 'ArrowDown']) },
                 changes: { code: CONFIG, language: 'json', theme: 'auto', height: 260, fit: false, dark: false, after: editThenChanges },
                 faults: { code: FAULTS, language: 'json', theme: 'auto', height: 220, fit: false, dark: false },
                 dark: { code: CONFIG, language: 'json', theme: 'dark', height: 400, fit: true, dark: true },
@@ -151,7 +175,8 @@
                         fitContent: { raw: state.fit },
                         validation: { raw: 'on' },
                         schema: { raw: state.schema || null },
-                        markdownView: { raw: state.markdownView || null }
+                        markdownView: { raw: state.markdownView || null },
+                        jsonView: { raw: state.jsonView || null }
                     },
                     fluentDesignLanguage: { isDarkTheme: state.dark, tokenTheme: {}, brand: {} },
                     mode: {

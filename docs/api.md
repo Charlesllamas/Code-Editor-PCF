@@ -136,6 +136,26 @@ and other media are decided before rendering, so nothing outside your
 environment is ever fetched. A link opens in a new tab through
 `context.navigation.openUrl`, and only over `http` or `https`.
 
+## The 1.7.0 property: jsonView
+
+One optional input, so a form configured for 1.6 opens exactly as it did.
+
+| Property | Usage | What it is |
+|---|---|---|
+| `jsonView` | input | *Open JSON in*: `edit` (the default) opens a JSON column as text, `tree` opens it as a read-only tree. The strip switches between the two either way. Ignored for every other language. |
+
+The tree reads the document the editor holds, strictly, as validation does:
+no comments and no trailing commas. A path is copied in JSONPath's shorthand
+(RFC 9535): `$` for the document, `.name` for a name that is a plain
+identifier, `['odd key']` for any other name, `[2]` for an item. It is a
+`role="tree"` with `aria-activedescendant` naming the focused row, whose
+`aria-level`, `aria-setsize`, `aria-posinset` and `aria-expanded` describe
+it, so the rows drawn can be only the ones in view.
+
+Copy path writes through the Clipboard API, and through
+`document.execCommand('copy')` where the browser refuses that — which on the
+test form, in the browser it was measured in, it did every time.
+
 ## Localisation
 
 Two resource files ship with the control:

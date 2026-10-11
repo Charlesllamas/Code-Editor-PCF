@@ -57,6 +57,12 @@ numbers, and finding out it was wrong when the integration fails.
   styles, frames and media do not. Images come only from your own
   environment: one from another site is shown as a link, never loaded, so
   opening a record tells nobody outside who opened it.
+- **A JSON tree** (from 1.7.0) — a JSON column gets **Tree** in the strip, and
+  can open as one (*Open JSON in*). Browse it with the arrow keys or the
+  mouse; **Enter** or a double-click takes you back to that node's text in the
+  editor, selected; **Ctrl+C** or **Copy path** copies where the node is, such
+  as `$.lines[0].sku`. With a schema in force, the strip shows what the schema
+  says about the node in focus. A read-only column gets the tree too.
 - **`isValid` and `problemCount`** for a canvas app to act on — a Save
   button that refuses an invalid document is one `DisplayMode` formula.
 - **Light or dark**, following the app's theme or forced either way.
@@ -75,6 +81,8 @@ numbers, and finding out it was wrong when the integration fails.
 ::image{src=media/screenshot-dark.png alt="The same editor in the dark theme, sized to its eight-line document" zoom}
 
 ::image{src=media/screenshot-changes.png alt="Changes open over a JSON document edited twice: each changed line shown removed in red and added in green, the changed words highlighted, and Back to editing in the strip" zoom}
+
+::image{src=media/screenshot-tree.png alt="An order opened as a tree: its id, its lines opened to the first line's sku and qty, the focus on qty, and the strip reading $.lines[0].qty — How many; at least one." zoom}
 
 ::image{src=media/screenshot-markdown.png alt="A Markdown checklist rendered in the preview: a heading, ticked and unticked tasks, a table, a quotation, and an image from another site shown as a link" zoom}
 

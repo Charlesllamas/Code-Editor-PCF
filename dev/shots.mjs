@@ -40,6 +40,9 @@ const SHOTS = {
     'fetchxml-faults': { file: 'screenshot-fetchxml-faults.png', height: 244 },
     markdown: { file: 'screenshot-markdown.png', height: 384 },
     changes: { file: 'screenshot-changes.png', height: 284 },
+    // 1.7.0: the tree on a schema'd order, focus two levels in; and dark.
+    tree: { file: 'screenshot-tree.png', height: 324 },
+    'tree-dark': { file: 'screenshot-tree-dark.png', height: 284 },
 };
 
 const BROWSERS = [

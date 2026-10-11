@@ -94,6 +94,44 @@ opens rendered.
   `<br>` and the like. Scripts, event handlers, styles, frames, forms and media
   are removed.
 
+## JSON tree
+
+From 1.7.0, a column whose `language` is `json` gets **Tree** in the strip,
+and **Edit** to return. Set *Open JSON in* to **Tree** for a column people
+mostly browse — an integration's payload, a configuration they should not
+have to read as text — and it opens as a tree.
+
+The tree opens on the node the caret was in, with the way to it open. From
+there:
+
+| Key | What it does |
+|---|---|
+| ↑ ↓ | The row above or below |
+| → | Opens a closed node; on an open one, moves to its first child |
+| ← | Closes an open node; otherwise moves to its parent |
+| Home, End | The first or last row |
+| Page Up, Page Down | A page of rows |
+| `*` | Opens every node beside this one |
+| Enter | Back to the editor with this node's text selected |
+| Ctrl+C | Copies this node's path, such as `$.lines[0].sku` |
+| A letter | The next row whose name starts with it; type quickly for more letters |
+
+A click on a row moves to it, a click on its arrow opens or closes it, and a
+double-click goes back to its text. The strip shows the path to the node in
+focus — and, with a schema in force, what the schema says about the place —
+and **Copy path** copies it.
+
+The tree is one stop for Tab: Tab moves on to the next field, as it does from
+the editor. Each row tells assistive technology its name, its value or how
+many items or keys it holds, and its level and place among its siblings.
+
+- **A fault**: while the JSON has one, there is no tree — the fault is named
+  where the tree would be, with **Go to the fault**.
+- **Read-only and field-secured columns** get the tree too; it never edits.
+- **The form changing the value** — a script, another user's save brought in
+  by a refresh — rebuilds the tree, keeping what you had open and the node you
+  were on, or the nearest one left.
+
 ## Validation and Format
 
 With `validation` on (the default), a JSON document is parsed strictly on

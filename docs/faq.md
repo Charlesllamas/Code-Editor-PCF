@@ -177,6 +177,13 @@ Yes, from 1.6.0: press **Preview** in the strip, or set *Open Markdown in* to
 **Preview** and the column opens rendered. Only images from your own
 environment are drawn — see [Limitations](limitations) for why.
 
+## Can I browse a JSON column as a tree?
+
+Yes, from 1.7.0: press **Tree** in the strip, or set *Open JSON in* to
+**Tree** and the column opens as one. **Enter** on a node takes you back to
+its text in the editor; **Ctrl+C** copies its path. See
+[Model-driven apps](model-driven).
+
 ## Something is broken. Where do I report it?
 
 Open an issue on

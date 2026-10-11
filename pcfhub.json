@@ -3,7 +3,7 @@
   "slug": "pcf-code-editor",
   "name": "Code Editor",
   "tagline": "Edit JSON, XML and other code in a multiline text column, with Monaco.",
-  "summary": "Replaces the plain text box on a multi-line text column with Monaco, the editor from VS Code, for solutions that keep JSON or XML in a column and need somebody to edit it safely.\n\n- Syntax colouring for fourteen languages, with bracket matching, folding, and find and replace\n- Strict validation for JSON, XML and FetchXML, with every fault marked and named\n- Checking, completion and hover from a JSON Schema kept as a web resource\n- FetchXML completion with your environment's own tables, columns and choices\n- **Format** for JSON, XML and FetchXML\n- **Changes**: what you changed since the record was saved, side by side, and still editable\n- A **Markdown preview**, sanitised, with images only from your own environment\n\nMonaco is compiled into the solution, so nothing is fetched at runtime. In a canvas app, `isValid` can gate a Save button; on a form the editor shows a fault but cannot refuse a save. The other languages are coloured, not checked.",
+  "summary": "Replaces the plain text box on a multi-line text column with Monaco, the editor from VS Code, for solutions that keep JSON or XML in a column and need somebody to edit it safely.\n\n- Syntax colouring for fourteen languages, with bracket matching, folding, and find and replace\n- Strict validation for JSON, XML and FetchXML, with every fault marked and named\n- Checking, completion and hover from a JSON Schema kept as a web resource\n- FetchXML completion with your environment's own tables, columns and choices\n- **Format** for JSON, XML and FetchXML\n- **Changes**: what you changed since the record was saved, side by side, and still editable\n- A **Markdown preview**, sanitised, with images only from your own environment\n- A **JSON tree** to browse a document by keyboard or mouse, copy a node's path, and jump back to its text\n\nMonaco is compiled into the solution, so nothing is fetched at runtime. In a canvas app, `isValid` can gate a Save button; on a form the editor shows a fault but cannot refuse a save. The other languages are coloured, not checked.",
   "category": "text-editors",
   "hosts": [
     "canvas",
@@ -47,6 +47,7 @@
       "media/screenshot-xml.png",
       "media/screenshot-fetchxml.png",
       "media/screenshot-fetchxml-faults.png",
+      "media/screenshot-tree.png",
       "media/screenshot-changes.png",
       "media/screenshot-markdown.png"
     ]
@@ -76,7 +77,8 @@
           "fitContent": false,
           "validation": "on",
           "schema": "",
-          "markdownView": "edit"
+          "markdownView": "edit",
+          "jsonView": "edit"
         },
         "isDefault": true
       },
@@ -92,7 +94,8 @@
           "fitContent": false,
           "validation": "on",
           "schema": "",
-          "markdownView": "edit"
+          "markdownView": "edit",
+          "jsonView": "edit"
         }
       },
       {
@@ -107,7 +110,24 @@
           "fitContent": false,
           "validation": "on",
           "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\"},\"lines\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\"},\"qty\":{\"type\":\"integer\",\"minimum\":1}}}},\"status\":{\"enum\":[\"open\",\"closed\"]}},\"additionalProperties\":false}",
-          "markdownView": "edit"
+          "markdownView": "edit",
+          "jsonView": "edit"
+        }
+      },
+      {
+        "slug": "tree",
+        "name": "JSON, as a tree",
+        "description": "The order opened as a read-only tree. Arrows move and open nodes, Enter goes back to the node’s text in the editor, Ctrl+C copies its path, and the strip shows what the schema says about the node in focus.",
+        "props": {
+          "code": "{\n  \"id\": 1042,\n  \"lines\": [\n    {\n      \"sku\": \"PCF-001\",\n      \"qty\": 2\n    },\n    {\n      \"sku\": \"PCF-002\",\n      \"qty\": 1\n    },\n    {\n      \"sku\": \"PCF-007\",\n      \"qty\": 12\n    }\n  ],\n  \"status\": \"open\"\n}",
+          "language": "json",
+          "theme": "auto",
+          "height": 320,
+          "fitContent": false,
+          "validation": "on",
+          "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\",\"title\":\"Order number\",\"description\":\"The number the order was issued under.\"},\"lines\":{\"type\":\"array\",\"description\":\"One entry per product ordered.\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\",\"markdownDescription\":\"The **stock keeping unit**, as printed on the label.\"},\"qty\":{\"type\":\"integer\",\"minimum\":1,\"default\":1,\"description\":\"How many; at least one.\"}}}},\"status\":{\"enum\":[\"open\",\"closed\"],\"default\":\"open\",\"description\":\"Where the order is in its life.\"}},\"additionalProperties\":false}",
+          "markdownView": "edit",
+          "jsonView": "tree"
         }
       },
       {
@@ -122,7 +142,8 @@
           "fitContent": false,
           "validation": "on",
           "schema": "{\"type\":\"object\",\"required\":[\"id\",\"lines\"],\"properties\":{\"id\":{\"type\":\"number\",\"title\":\"Order number\",\"description\":\"The number the order was issued under.\"},\"lines\":{\"type\":\"array\",\"description\":\"One entry per product ordered.\",\"items\":{\"type\":\"object\",\"required\":[\"sku\"],\"properties\":{\"sku\":{\"type\":\"string\",\"markdownDescription\":\"The **stock keeping unit**, as printed on the label.\"},\"qty\":{\"type\":\"integer\",\"minimum\":1,\"default\":1,\"description\":\"How many; at least one.\"}}}},\"status\":{\"enum\":[\"open\",\"closed\"],\"default\":\"open\",\"description\":\"Where the order is in its life.\"}},\"additionalProperties\":false}",
-          "markdownView": "edit"
+          "markdownView": "edit",
+          "jsonView": "edit"
         }
       },
       {
@@ -137,7 +158,8 @@
           "fitContent": true,
           "validation": "on",
           "schema": "",
-          "markdownView": "edit"
+          "markdownView": "edit",
+          "jsonView": "edit"
         }
       },
       {
@@ -152,7 +174,8 @@
           "fitContent": false,
           "validation": "on",
           "schema": "",
-          "markdownView": "edit"
+          "markdownView": "edit",
+          "jsonView": "edit"
         }
       },
       {
@@ -167,7 +190,8 @@
           "fitContent": false,
           "validation": "on",
           "schema": "",
-          "markdownView": "edit"
+          "markdownView": "edit",
+          "jsonView": "edit"
         }
       },
       {
@@ -182,7 +206,8 @@
           "fitContent": false,
           "validation": "on",
           "schema": "",
-          "markdownView": "preview"
+          "markdownView": "preview",
+          "jsonView": "edit"
         }
       },
       {
@@ -197,7 +222,8 @@
           "fitContent": false,
           "validation": "on",
           "schema": "",
-          "markdownView": "edit"
+          "markdownView": "edit",
+          "jsonView": "edit"
         }
       }
     ],

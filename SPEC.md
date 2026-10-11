@@ -69,9 +69,11 @@ adopted onto the hub without one, so the findings below start there; what
 **`dev/smoke.js` does not load the bundle.** Monaco reads `document` at
 module scope, so the bundle fails to *load* under `dev/dom.js`, not merely to
 render (measured 2026-08-28). The control keeps its decisions in modules that
-import nothing of Monaco — `languages.ts`, `validate.ts`, `sizing.ts`,
-`theme.ts` — and the suite transpiles those with the TypeScript already in
-`devDependencies` and drives them directly. Its loader throws if one of them
+import nothing of Monaco — the suite loads twenty-eight of them by 1.7.0, from `languages.ts`,
+`validate.ts`, `sizing.ts` and `theme.ts` through the schema, FetchXML,
+baseline, preview-policy and strip modules to 1.7.0's `jsonTree.ts`,
+`treeKeys.ts` and `treeWindow.ts` — and the suite transpiles those with the
+TypeScript already in `devDependencies` and drives them directly. Its loader throws if one of them
 imports Monaco, so the boundary is enforced rather than remembered.
 
 What the suite therefore proves is the decision; what it cannot prove is that
@@ -79,12 +81,21 @@ What the suite therefore proves is the decision; what it cannot prove is that
 (`npm run harness`), whose switches include the one that matters most for
 1.2.0 — *Host allocates a height* off, which is what a model-driven form does.
 
+From 1.7.0 a third piece presses real keys: `dev/keys-walk.js`
+(`npm run keys`) serves the harness, opens the tree and walks it with
+`dev/keys.js` (the template's), asserting where `aria-activedescendant`
+points, what the strip says, and what Enter selects in the editor. The suite
+proves the key map as a function; the walk proves the control listens on the
+element that has focus and keeps the focused row drawn.
+
 ## Demo
 
-`full`. Nothing leaves the browser: validation is a main-thread parse, the XML
-check is the browser's own `DOMParser`, the theme is a switch, and the
-formatter is `jsonc-parser`. Four presets, each setting every input, because
-of the `default-value` finding above.
+`limited` since 1.4.0 (it was `full` before): a schema is a web resource on
+a form and inline in the demo, FetchXML has no table definitions there, and
+the Markdown preview has no environment to draw images from — the three
+`demo.limitations` say so. Nothing leaves the browser. Ten presets by 1.7.0,
+each setting every input, because of the `default-value` finding above —
+1.7.0 added `jsonView` to all nine and a tenth, *JSON, as a tree*.
 
 ## Screenshots
 
