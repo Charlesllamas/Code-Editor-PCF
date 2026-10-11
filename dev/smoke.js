@@ -762,16 +762,20 @@ section('previewPolicy.ts — what the preview opens, and which images it draws 
     check('a title is marked only by the mark: an ordinary title, or the mark with no index, is not', [markedIndex('0'), markedIndex(IMAGE_MARK), markedIndex(IMAGE_MARK + 'x'), markedIndex(null)], [null, null, null, null]);
 }
 
-const { stripButtons, initialMode, settleMode, readMarkdownView } = load('strip');
+const { stripButtons, initialMode, settleMode, readMarkdownView, readJsonView } = load('strip');
 
-section('strip.ts — the three modes, and the buttons each offers');
+section('strip.ts — the four modes, and the buttons each offers');
 
 {
     const base = { mode: 'edit', language: 'json', readOnly: false, validating: true, syntaxFault: false, differs: false };
     const on = (s) => Object.keys(stripButtons(s)).filter((k) => stripButtons(s)[k]);
-    check('editing JSON, unchanged: Format alone, as in 1.5', on(base), ['format']);
-    check('…changed since the save: Changes beside it', on({ ...base, differs: true }), ['format', 'changes']);
-    check('…read-only: nothing to format and no changes of the user\'s to show', on({ ...base, differs: true, readOnly: true }), []);
+    check('editing JSON, unchanged: Format, and 1.7.0\'s Tree', on(base), ['format', 'tree']);
+    check('…changed since the save: Changes beside them', on({ ...base, differs: true }), ['format', 'changes', 'tree']);
+    check('…read-only: nothing to format and no changes of the user\'s to show, but a tree to browse', on({ ...base, differs: true, readOnly: true }), ['tree']);
+    check('Tree is JSON\'s alone', [on({ ...base, language: 'xml' }), on({ ...base, language: 'fetchxml' }), on({ ...base, language: 'yaml' })], [['format'], ['format'], []]);
+    check('in the tree: Edit, and Copy path once a node has focus', [on({ ...base, mode: 'tree' }), on({ ...base, mode: 'tree', treeFocus: true })], [['edit'], ['edit', 'copyPath']]);
+    check('…no Copy path where the browser has no way to write the clipboard (P3)', on({ ...base, mode: 'tree', treeFocus: true, canCopy: false }), ['edit']);
+    check('…and a read-only field keeps both', on({ ...base, mode: 'tree', treeFocus: true, readOnly: true }), ['edit', 'copyPath']);
     check('XML with a fault under validation: no Format, as before', on({ ...base, language: 'xml', syntaxFault: true }), []);
     check('Markdown: Preview, and no Format', on({ ...base, language: 'markdown', differs: true }), ['changes', 'preview']);
     check('…read-only Markdown can still be previewed', on({ ...base, language: 'markdown', readOnly: true }), ['preview']);
@@ -783,7 +787,134 @@ section('strip.ts — the three modes, and the buttons each offers');
     check('the preview leaves when the language stops being Markdown', settleMode('preview', 'json', false), 'edit');
     check('Changes leaves when the field turns read-only', settleMode('changes', 'json', true), 'edit');
     check('…and both stay otherwise', [settleMode('preview', 'markdown', true), settleMode('changes', 'json', false)], ['preview', 'changes']);
+
+    check('jsonView: tree, case and spaces forgiven; anything else is edit', [readJsonView('tree'), readJsonView(' Tree '), readJsonView('edit'), readJsonView(null), readJsonView('preview')], ['tree', 'tree', 'edit', 'edit', 'edit']);
+    check('a JSON editor set to tree mounts in the tree; any other language ignores it', [initialMode('edit', 'json', 'tree'), initialMode('edit', 'xml', 'tree'), initialMode('edit', 'json', 'edit'), initialMode('edit', 'json')], ['tree', 'edit', 'edit', 'edit']);
+    check('each view speaks for its own language only', [initialMode('preview', 'json', 'tree'), initialMode('preview', 'markdown', 'tree')], ['tree', 'preview']);
+    check('the tree leaves when the language stops being JSON, and stays on a read-only field', [settleMode('tree', 'xml', false), settleMode('tree', 'json', true)], ['edit', 'tree']);
 }
+
+/* ============================================================ JSON tree */
+
+const tree = load('jsonTree');
+
+section('jsonTree.ts — the document as nodes that know where their text is (1.7.0)');
+
+{
+    const text = '{\n  "id": 7,\n  "odd key": "x",\n  "lines": [ { "sku": "a" }, 2 ],\n  "empty": {},\n  "none": null\n}';
+    const built = tree.buildTree(text);
+    check('a document validation passes is a tree', built.kind, 'ok');
+    const root = built.root;
+    check('the root: an object with five keys, no name', [root.type, root.count, root.key, root.path], ['object', 5, null, []]);
+    check('children in document order, typed', root.children.map((c) => [c.key, c.type]), [['id', 'number'], ['odd key', 'string'], ['lines', 'array'], ['empty', 'object'], ['none', 'null']]);
+    const sku = tree.findNode(root, ['lines', 0, 'sku']);
+    check('a node found by path carries its path and value', [sku.path, sku.value], [['lines', 0, 'sku'], 'a']);
+    check('array items are numbered, with no name offset', [tree.findNode(root, ['lines', 1]).key, tree.findNode(root, ['lines', 1]).keyOffset], [1, null]);
+    check('a place the document does not have is null', tree.findNode(root, ['lines', 5]), null);
+
+    const sel = (n) => { const r = tree.selectionOf(n); return text.slice(r.start, r.end); };
+    check('selectionOf: a property from its name to the end of its value', [sel(tree.findNode(root, ['id'])), sel(sku), sel(tree.findNode(root, ['lines', 1]))], ['"id": 7', '"sku": "a"', '2']);
+    check('…the root is the whole document', sel(root), text);
+
+    check('nodeAtOffset: a caret in a value finds that node', tree.nodeAtOffset(root, text.indexOf('"a"') + 1).path, ['lines', 0, 'sku']);
+    check('…on a property\'s name finds the property', tree.nodeAtOffset(root, text.indexOf('"odd key"') + 2).path, ['odd key']);
+    check('…between properties, the object they are in', tree.nodeAtOffset(root, text.indexOf('[') + 1).path, ['lines']);
+    check('…at the very start, the root', tree.nodeAtOffset(root, 0).path, []);
+
+    check('nearestNode: the place, or what is left of the way to it', [tree.nearestNode(root, ['lines', 0, 'sku']).path, tree.nearestNode(root, ['lines', 9, 'x']).path, tree.nearestNode(root, ['gone']).path], [['lines', 0, 'sku'], ['lines'], []]);
+
+    const open = new Set([tree.pathKey([])]);
+    const rows = tree.visibleRows(root, open);
+    check('visibleRows: the root open shows its five keys, level 2', rows.map((r) => [r.node.key, r.level]), [[null, 1], ['id', 2], ['odd key', 2], ['lines', 2], ['empty', 2], ['none', 2]]);
+    check('…each with its place among its siblings', rows.slice(1).map((r) => r.posInSet + '/' + r.setSize), ['1/5', '2/5', '3/5', '4/5', '5/5']);
+    check('…expanded only on what can open: an empty object cannot', rows.map((r) => r.expanded), [true, undefined, undefined, false, undefined, undefined]);
+    const deeper = tree.visibleRows(root, tree.expandTo(open, sku));
+    check('expandTo opens every ancestor, so the node is a row', deeper.map((r) => r.node.path.join('.')), ['', 'id', 'odd key', 'lines', 'lines.0', 'lines.0.sku', 'lines.1', 'empty', 'none']);
+    check('…without touching the set it was given', open.size, 1);
+    check('a closed root is one row', tree.visibleRows(root, new Set()).length, 1);
+
+    check('formatPath: $, dots for names, brackets for indexes', tree.formatPath(['lines', 0, 'sku']), '$.lines[0].sku');
+    check('…quoted brackets for a name that is not an identifier, escaped', [tree.formatPath(['odd key']), tree.formatPath(["it's"]), tree.formatPath(['a\\b']), tree.formatPath(['2x']), tree.formatPath(['$ref'])], ["$['odd key']", "$['it\\'s']", "$['a\\\\b']", "$['2x']", "$['$ref']"]);
+    check('…the root is $', tree.formatPath([]), '$');
+
+    check('previewOf: counts for containers, JSON for scalars', [tree.previewOf(root), tree.previewOf(tree.findNode(root, ['lines'])), tree.previewOf(tree.findNode(root, ['empty'])), tree.previewOf(tree.findNode(root, ['id'])), tree.previewOf(tree.findNode(root, ['none'])), tree.previewOf(sku)], ['{5}', '[2]', '{0}', '7', 'null', '"a"']);
+    const long = tree.buildTree(JSON.stringify({ s: 'x'.repeat(300) })).root.children[0];
+    check('…a long string is cut, still quoted', [tree.previewOf(long, 20).length, tree.previewOf(long, 20).endsWith('…"')], [20, true]);
+
+    check('no tree for an empty column', [tree.buildTree('').kind, tree.buildTree('  \n ').kind], ['empty', 'empty']);
+    const faulty = tree.buildTree('{ "a": 1, }');
+    check('no tree for a document with a fault, and the first fault to go to — strict, as validation is: the trailing comma, reported at the brace after it', [faulty.kind, faulty.first.line, faulty.first.column], ['faults', 1, 11]);
+    check('…a comment is a fault too', tree.buildTree('{ // no\n "a": 1 }').kind, 'faults');
+    check('a bare scalar is a tree of one', [tree.buildTree('42').kind, tree.buildTree('42').root.type, tree.visibleRows(tree.buildTree('42').root, new Set()).length], ['ok', 'number', 1]);
+}
+
+/* ============================================================ tree keys */
+
+const keys = load('treeKeys');
+
+section('treeKeys.ts — the WAI-ARIA tree\'s keys, every one the form let through (P2)');
+
+{
+    const root = tree.buildTree('{ "a": { "x": 1, "y": [1, 2] }, "b": 2, "c": { "z": 3 } }').root;
+    let expanded = new Set([tree.pathKey([])]);
+    let rows = tree.visibleRows(root, expanded);
+    const name = (i) => rows[i].node.path.join('.') || '$';
+    const go = (focus, key, extra) => keys.treeKey(rows, focus, expanded, { key, ...(extra || {}) }, 3);
+
+    check('Down and Up move one row, and stop at the ends', [go(0, 'ArrowDown').focus, go(1, 'ArrowUp').focus, go(0, 'ArrowUp').focus, go(rows.length - 1, 'ArrowDown').focus], [1, 0, 0, rows.length - 1]);
+    check('Home and End', [go(2, 'Home').focus, go(0, 'End').focus], [0, rows.length - 1]);
+    check('Page Down and Page Up move by a page', [go(0, 'PageDown').focus, go(3, 'PageUp').focus], [3, 0]);
+
+    let r = go(1, 'ArrowRight');
+    check('Right on a closed node opens it, focus stays', [r.focus, r.expanded.has(tree.pathKey(['a'])), r.handled], [1, true, true]);
+    expanded = r.expanded;
+    rows = tree.visibleRows(root, expanded);
+    check('…the rows now show its children', rows.map((x, i) => name(i)), ['$', 'a', 'a.x', 'a.y', 'b', 'c']);
+    check('Right on an open node moves to its first child', name(go(1, 'ArrowRight').focus), 'a.x');
+    check('Right on a leaf does nothing, and is still the tree\'s', [go(2, 'ArrowRight').focus, go(2, 'ArrowRight').handled], [2, true]);
+    check('Left on a leaf goes to its parent', name(go(2, 'ArrowLeft').focus), 'a');
+    r = go(1, 'ArrowLeft');
+    check('Left on an open node closes it, focus stays', [r.focus, r.expanded.has(tree.pathKey(['a']))], [1, false]);
+    check('Left on the open root closes it: there is no parent to go to', [go(0, 'ArrowLeft').focus, go(0, 'ArrowLeft').expanded.has(tree.pathKey([]))], [0, false]);
+
+    r = go(4, '*');
+    check('* opens every sibling that can open, focus stays', [r.focus, r.expanded.has(tree.pathKey(['a'])), r.expanded.has(tree.pathKey(['c'])), r.expanded.has(tree.pathKey(['b']))], [4, true, true, false]);
+    check('…and leaves the set it was given alone', expanded.has(tree.pathKey(['c'])), false);
+
+    check('Enter asks for the node\'s text', [go(4, 'Enter').action, go(4, 'Enter').focus], ['reveal', 4]);
+    check('Ctrl+C and Cmd+C ask for the path', [go(4, 'c', { ctrl: true }).action, go(4, 'C', { meta: true }).action], ['copy', 'copy']);
+    check('…any other shortcut is the host\'s, untouched', [go(4, 's', { ctrl: true }).handled, go(4, 'c', { ctrl: true, alt: true }).handled, go(4, 'ArrowDown', { alt: true }).handled], [false, false, false]);
+    check('Space is taken and moves nothing: the scroller would jump a page', [go(4, ' ').handled, go(4, ' ').focus], [true, 4]);
+    check('Escape, Tab and F2 are not the tree\'s', [go(4, 'Escape').handled, go(4, 'Tab').handled, go(4, 'F2').handled], [false, false, false]);
+    check('no rows, nothing taken', keys.treeKey([], 0, new Set(), { key: 'ArrowDown' }).handled, false);
+
+    check('parentRow finds the row a level up', [keys.parentRow(rows, 3), keys.parentRow(rows, 1), keys.parentRow(rows, 0)], [1, 0, -1]);
+    check('type-ahead: a first letter searches from the next row, wrapping', [name(keys.typeAhead(rows, 0, 'b')), name(keys.typeAhead(rows, 4, 'b')), keys.typeAhead(rows, 0, 'q')], ['b', 'b', -1]);
+    {
+        const two = tree.visibleRows(tree.buildTree('{ "beta": 1, "bravo": 2 }').root, new Set([tree.pathKey([])]));
+        check('…one letter again moves on; a growing buffer searches from the row it is on', [keys.typeAhead(two, 1, 'b'), keys.typeAhead(two, 1, 'be'), keys.typeAhead(two, 1, 'br')], [2, 1, 2]);
+    }
+    check('…case is forgiven', name(keys.typeAhead(rows, 0, 'C')), 'c');
+    check('what counts as type-ahead: one character, no shortcut, not Space or *', [keys.isTypeAhead({ key: 'a' }), keys.isTypeAhead({ key: 'a', ctrl: true }), keys.isTypeAhead({ key: ' ' }), keys.isTypeAhead({ key: '*' }), keys.isTypeAhead({ key: 'Enter' })], [true, false, false, false, false]);
+}
+
+/* ========================================================== tree window */
+
+const win = load('treeWindow');
+
+section('treeWindow.ts — only the rows in view are drawn (P1: 10,000 rows took 167–177 ms on the form)');
+
+check('the top of a long list: the view and the overscan below it', win.windowOf(0, 220, 22, 43206), { first: 0, end: 19 });
+check('scrolled: overscan both sides', win.windowOf(2200, 220, 22, 43206), { first: 92, end: 119 });
+check('the end of the list is not passed', win.windowOf(22 * 43200, 220, 22, 43206), { first: 43192, end: 43206 });
+check('a short list is drawn whole', win.windowOf(0, 220, 22, 4), { first: 0, end: 4 });
+check('nothing to draw', [win.windowOf(0, 220, 22, 0), win.windowOf(0, 220, 0, 10)], [{ first: 0, end: 0 }, { first: 0, end: 0 }]);
+check('a tab not yet shown has no height: still a window, not nothing', win.windowOf(0, 0, 22, 100), { first: 0, end: 9 });
+check('scrollFor: a row in view leaves the scroll alone', win.scrollFor(3, 0, 220, 22), 0);
+check('…below the view, scrolls just far enough', win.scrollFor(20, 0, 220, 22), 242);
+check('…above it, to its top', win.scrollFor(2, 200, 220, 22), 44);
+check('pageOf: whole rows in view, less one for context', [win.pageOf(220, 22), win.pageOf(10, 22)], [9, 1]);
+
 
 /* ============================================================ page theme */
 

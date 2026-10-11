@@ -376,6 +376,204 @@
 }
 
 /*
+ * 1.7.0's tree, in the editor's box like the other views. The scroller is
+ * the one tab stop; rows are drawn in a window over a track as tall as all
+ * of them, absolutely placed at a fixed 22px (TREE_ROW_HEIGHT in index.ts —
+ * the two numbers have to agree, or the window draws the wrong rows).
+ * Colours are Monaco's own JSON colours per theme, so a node reads as it
+ * does in the editor.
+ */
+.CodeEditor-tree {
+    flex: 0 0 auto;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background: #ffffff;
+    color: #242424;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree {
+    background: #1e1e1e;
+    color: #d4d4d4;
+}
+
+.CodeEditor-tree-view {
+    position: relative;
+    height: 100%;
+    overflow: auto;
+    box-sizing: border-box;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 13px;
+}
+
+.CodeEditor-tree-view:focus-visible {
+    outline: 2px solid #000000;
+    outline-offset: -2px;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-view:focus-visible {
+    outline-color: #ffffff;
+}
+
+.CodeEditor-tree-rows {
+    position: relative;
+    min-width: 100%;
+}
+
+.CodeEditor-tree-row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 22px;
+    line-height: 22px;
+    box-sizing: border-box;
+    padding-left: calc(4px + var(--CodeEditor-tree-level, 0) * 16px);
+    padding-right: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: default;
+    user-select: text;
+}
+
+.CodeEditor-tree-row:hover {
+    background: #f2f2f2;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-row:hover {
+    background: #2a2d2e;
+}
+
+/* The focused row: tinted always, outlined while the tree has the keyboard. */
+.CodeEditor-tree-row[aria-selected="true"] {
+    background: #e4e6f1;
+}
+
+.CodeEditor-tree-view:focus .CodeEditor-tree-row[aria-selected="true"] {
+    background: #dcebfc;
+    outline: 1px solid #0078d4;
+    outline-offset: -1px;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-row[aria-selected="true"] {
+    background: #37373d;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-view:focus .CodeEditor-tree-row[aria-selected="true"] {
+    background: #04395e;
+    outline-color: #0078d4;
+}
+
+.CodeEditor-tree-twisty {
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    color: #616161;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-twisty {
+    color: #c5c5c5;
+}
+
+.CodeEditor-tree-key {
+    color: #0451a5;
+}
+
+.CodeEditor-tree-key::after {
+    content: ": ";
+    color: #242424;
+}
+
+.CodeEditor-tree-index {
+    color: #616161;
+}
+
+.CodeEditor-tree--string { color: #a31515; }
+.CodeEditor-tree--number { color: #098658; }
+.CodeEditor-tree--boolean,
+.CodeEditor-tree--null { color: #0000ff; }
+.CodeEditor-tree--object,
+.CodeEditor-tree--array { color: #616161; }
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-key { color: #9cdcfe; }
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-key::after { color: #d4d4d4; }
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-index { color: #a0a0a0; }
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree--string { color: #ce9178; }
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree--number { color: #b5cea8; }
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree--boolean,
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree--null { color: #569cd6; }
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree--object,
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree--array { color: #a0a0a0; }
+
+/* No tree: the fault, or nothing yet, where the tree would be. */
+.CodeEditor-tree-message {
+    height: 100%;
+    box-sizing: border-box;
+    padding: 8px 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow: auto;
+}
+
+.CodeEditor-tree-message > p {
+    margin: 0 0 8px;
+}
+
+/* Go to the fault: the strip's button, with an edge, since it stands alone on the page. */
+.CodeEditor-tree-message button {
+    font: inherit;
+    font-size: 12px;
+    line-height: 22px;
+    color: inherit;
+    background: transparent;
+    border: 1px solid #c8c8c8;
+    border-radius: 2px;
+    padding: 0 10px;
+    cursor: pointer;
+}
+
+.CodeEditor-tree-message button:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-message button {
+    border-color: #555555;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-message button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.CodeEditor-tree-message button:focus-visible {
+    outline: 2px solid #000000;
+    outline-offset: 1px;
+}
+
+.CodeEditor[data-theme="vs-dark"] .CodeEditor-tree-message button:focus-visible {
+    outline-color: #ffffff;
+}
+
+.CodeEditor-tree > [hidden] {
+    display: none;
+}
+
+/* The focused node's path in the strip, cut from the right when it is long. */
+.CodeEditor-path {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: Consolas, "Courier New", monospace;
+}
+
+.CodeEditor-announce {
+    flex: 0 0 auto;
+    font-weight: 600;
+}
+
+/*
  * Under forced colours every tint above collapses to a system keyword, and
  * the problem is still a problem: keep the glyph, the border and the focus
  * ring, and let the browser pick the colours.
@@ -384,5 +582,11 @@
     .CodeEditor-status {
         border-top: 1px solid CanvasText;
         forced-color-adjust: auto;
+    }
+
+    /* The focused row keeps a mark of its own when the tints are gone. */
+    .CodeEditor-tree-row[aria-selected="true"] {
+        outline: 1px solid Highlight;
+        outline-offset: -1px;
     }
 }

@@ -77,6 +77,17 @@
     </property>
 
     <!--
+      1.7.0: how a JSON column opens — as text to edit, or as a read-only tree
+      whose rows lead back into the text. The strip switches between the two
+      either way. An Enum defaulting to edit, so a form that had 1.6 opens as
+      it did; any other language ignores it.
+    -->
+    <property name="jsonView" display-name-key="JsonView_Display_Key" description-key="JsonView_Desc_Key" of-type="Enum" usage="input" required="false" default-value="edit">
+      <value name="edit" display-name-key="JsonView_Edit_Key">edit</value>
+      <value name="tree" display-name-key="JsonView_Tree_Key">tree</value>
+    </property>
+
+    <!--
       The control's own verdict, for a canvas app to act on — a Save button's
       DisplayMode, say. Outputs are permanent API: a formula may bind them.
       With validation off the verdict is the neutral one, valid and 0.

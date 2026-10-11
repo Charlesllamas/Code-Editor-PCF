@@ -509,4 +509,52 @@
   <data name="Fetch_NotAnOption" xml:space="preserve">
     <value>{0} is not an option of {1}.{2}</value>
   </data>
+  <data name="JsonView_Display_Key" xml:space="preserve">
+    <value>Open JSON in</value>
+  </data>
+  <data name="JsonView_Desc_Key" xml:space="preserve">
+    <value>Whether a JSON column opens as text to edit or as a tree to browse. The strip under it switches between the two either way. Other languages ignore it.</value>
+  </data>
+  <data name="JsonView_Edit_Key" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="JsonView_Tree_Key" xml:space="preserve">
+    <value>Tree</value>
+  </data>
+  <data name="Status_Tree" xml:space="preserve">
+    <value>Tree</value>
+  </data>
+  <data name="Status_TreeHint" xml:space="preserve">
+    <value>Browse the JSON as a tree. Enter on a node goes back to its text.</value>
+  </data>
+  <data name="Status_CopyPath" xml:space="preserve">
+    <value>Copy path</value>
+  </data>
+  <data name="Status_CopyPathHint" xml:space="preserve">
+    <value>Copy the path to this node, such as $.items[2].name (Ctrl+C)</value>
+  </data>
+  <data name="Tree_Label" xml:space="preserve">
+    <value>JSON tree</value>
+  </data>
+  <data name="Tree_Empty" xml:space="preserve">
+    <value>Nothing to show yet.</value>
+  </data>
+  <data name="Tree_Faults" xml:space="preserve">
+    <value>There is no tree while the JSON has a fault. {0}</value>
+  </data>
+  <data name="Tree_GoToFault" xml:space="preserve">
+    <value>Go to the fault</value>
+  </data>
+  <data name="Tree_Copied" xml:space="preserve">
+    <value>Copied {0}</value>
+  </data>
+  <data name="Tree_CopyFailed" xml:space="preserve">
+    <value>The browser did not allow copying. The path is in the strip to select and copy.</value>
+  </data>
+  <data name="Tree_Items" xml:space="preserve">
+    <value>{0} items</value>
+  </data>
+  <data name="Tree_Keys" xml:space="preserve">
+    <value>{0} keys</value>
+  </data>
 </root>

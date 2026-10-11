@@ -1,5 +1,5 @@
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
-import monaco, { resolveLanguage } from "./monacoSetup";
+import monaco, { rangeOf, resolveLanguage } from "./monacoSetup";
 import { displayName } from "./languages";
 import { hasValidator, isError, Problem, validateJson, validateXml } from "./validate";
 import { resolveHeight, resolveWidth, STATUS_BAR_HEIGHT } from "./sizing";
@@ -16,8 +16,22 @@ import { clipRects, createOverflowNode, viewportRect, watchOuterScroll } from ".
 import { EchoGuard } from "./echo";
 import { Baseline } from "./baseline";
 import { Verdict } from "./verdict";
-import { MarkdownView, Mode, initialMode, readMarkdownView, settleMode, stripButtons } from "./strip";
+import { JsonView, MarkdownView, Mode, initialMode, readJsonView, readMarkdownView, settleMode, stripButtons } from "./strip";
 import { renderPreview } from "./preview";
+import { Row, Segment, Tree, TreeNode, buildTree, expandTo, formatPath, nearestNode, nodeAtOffset, pathKey, previewOf, selectionOf, visibleRows } from "./jsonTree";
+import { isTypeAhead, treeKey, typeAhead } from "./treeKeys";
+import { pageOf, scrollFor, windowOf } from "./treeWindow";
+import { canCopy, copyText } from "./copy";
+import { firstOf, schemasAt } from "./schemaNav";
+
+/** 1.7.0: every tree row is this tall, so the window of rows drawn is arithmetic (treeWindow.ts). */
+const TREE_ROW_HEIGHT = 22;
+
+/** Type-ahead keeps adding to its search while the keys come this close together. */
+const TYPE_AHEAD_MS = 500;
+
+/** Each control's tree rows need ids no other editor on the form uses: aria-activedescendant names one. */
+let treeIds = 0;
 
 /** Owner key for the markers this control sets; Monaco keeps one list per owner. */
 const MARKER_OWNER = "pcf-code-editor";
@@ -60,6 +74,21 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private _backButton: HTMLButtonElement;
     private _previewButton: HTMLButtonElement;
     private _editButton: HTMLButtonElement;
+    /**
+     * 1.7.0: the tree's box; inside it the scroller that holds focus and
+     * names the focused row with aria-activedescendant, the rows' full-height
+     * track, and the message shown instead when there is no tree.
+     */
+    private _treeHost: HTMLDivElement;
+    private _treeView: HTMLDivElement;
+    private _treeRowsBox: HTMLDivElement;
+    private _treeMessage: HTMLDivElement;
+    private _treeButton: HTMLButtonElement;
+    private _copyPathButton: HTMLButtonElement;
+    /** The focused node's path in the strip; hidden from the status region, which would read every move. */
+    private _pathLabel: HTMLSpanElement;
+    /** "Copied", for a moment — inside the status region, so it is announced. */
+    private _announce: HTMLSpanElement;
 
     private _notifyOutputChanged: () => void;
     private _editor: monaco.editor.IStandaloneCodeEditor;
@@ -118,6 +147,21 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private _preview: { dispose(): void } | undefined;
     /** The environment's origin, for the preview's same-origin images; null without one. */
     private _origin: string | null = null;
+    /** `jsonView` as last read (1.7.0); a change re-decides the mode. */
+    private _jsonView: JsonView | undefined = undefined;
+    /** The document as a tree, built when the tree opens and when the value changes under it. */
+    private _tree: Tree | undefined;
+    private _treeRows: Row[] = [];
+    private _treeFocus = 0;
+    /** Open nodes by path (jsonTree.ts `pathKey`): survives a rebuild, and a trip to the editor and back. */
+    private _treeExpanded = new Set<string>();
+    private readonly _treeId = `CodeEditor-tree-${++treeIds}`;
+    /** The tree's visible height, as sizeContainer set it — clientHeight is 0 on a tab not yet shown. */
+    private _treeViewHeight = 0;
+    private _typed = "";
+    private _typedAt = 0;
+    private _announceTimer: number | undefined;
+    private _canCopy = true;
 
     /**
      * Used to initialize the control instance.
@@ -139,6 +183,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._container.style.textAlign = "left";
 
         this.buildDom();
+        this._canCopy = canCopy(this._container.ownerDocument);
         this.readInputs(context);
         this.applyTheme(context);
 
@@ -209,7 +254,7 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         });
 
         this.readSchema(context);
-        this.readMarkdownView(context);
+        this.readViews(context);
         this.layout(context);
         this.runValidate();
     }
@@ -277,11 +322,16 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         // Read on every pass: the hub's demo changes inputs on a mounted
         // control — a preset can switch the mode — and the mode has to stay
         // one the language and the field allow.
-        if (!this.readMarkdownView(context)) {
+        if (!this.readViews(context)) {
             this.setMode(this._mode);
         }
         if (valueChanged && this._mode === "preview") {
             this.showPreview();
+        }
+        // A form script or a demo preset changed the document under the open
+        // tree: rebuilt, with what was open and the focus kept by path.
+        if (valueChanged && this._mode === "tree") {
+            this.showTree("focus");
         }
 
         this.layout(context);
@@ -317,6 +367,11 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     public destroy(): void {
         this.closeChanges();
         this.closePreview();
+        this.closeTree();
+        if (this._announceTimer !== undefined) {
+            window.clearTimeout(this._announceTimer);
+            this._announceTimer = undefined;
+        }
         this._schemaToken++;
         if (this._validateTimer !== undefined) {
             window.clearTimeout(this._validateTimer);
@@ -395,7 +450,16 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
 
     /** The box the active view draws in. */
     private activeHost(): HTMLDivElement {
-        return this._mode === "changes" ? this._diffHost : this._mode === "preview" ? this._previewHost : this._editorHost;
+        switch (this._mode) {
+            case "changes":
+                return this._diffHost;
+            case "preview":
+                return this._previewHost;
+            case "tree":
+                return this._treeHost;
+            default:
+                return this._editorHost;
+        }
     }
 
     /** Typing in either editor holds a value the form's echo must not overwrite (echo.ts). */
@@ -404,17 +468,19 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     }
 
     /**
-     * Act on `markdownView` when it changed: it decides the mode a Markdown
-     * editor mounts in, and the hub's demo switches it on a mounted control.
-     * Returns whether it changed.
+     * Act on `markdownView` or `jsonView` when either changed: they decide
+     * the mode a Markdown or a JSON editor mounts in, and the hub's demo
+     * switches them on a mounted control. Returns whether either changed.
      */
-    private readMarkdownView(context: ComponentFramework.Context<IInputs>): boolean {
+    private readViews(context: ComponentFramework.Context<IInputs>): boolean {
         const view = readMarkdownView(context.parameters.markdownView?.raw);
-        if (view === this._markdownView) {
+        const jsonView = readJsonView(context.parameters.jsonView?.raw);
+        if (view === this._markdownView && jsonView === this._jsonView) {
             return false;
         }
         this._markdownView = view;
-        this.setMode(initialMode(view, this._language));
+        this._jsonView = jsonView;
+        this.setMode(initialMode(view, this._language, jsonView));
         return true;
     }
 
@@ -433,10 +499,14 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         if (next !== "preview") {
             this.closePreview();
         }
+        if (next !== "tree") {
+            this.closeTree();
+        }
         this._mode = next;
         this._editorHost.hidden = next !== "edit";
         this._diffHost.hidden = next !== "changes";
         this._previewHost.hidden = next !== "preview";
+        this._treeHost.hidden = next !== "tree";
         // Sized before the diff editor is born into it, for the reason the
         // editor's host is (init): a zero-height editor never paints colour.
         this.layout(this._context);
@@ -445,6 +515,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
             this.layout(this._context);
         } else if (next === "preview") {
             this.showPreview();
+        } else if (next === "tree") {
+            this.showTree("cursor");
         }
         this.renderStatus();
     }
@@ -534,6 +606,302 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         if (typeof navigation?.openUrl === "function") {
             navigation.openUrl(url);
         }
+    }
+
+    /* ------------------------------------------------- 1.7.0: the tree */
+
+    /**
+     * Build the tree from the document and show it. `from` says which node
+     * takes the focus: the one under the editor's caret when the tree opens,
+     * or the one that had it when the value changed underneath — or its
+     * nearest ancestor left, if the change took it away.
+     */
+    private showTree(from: "cursor" | "focus"): void {
+        const before = this._treeRows[this._treeFocus]?.node.path;
+        const text = this._editor.getValue();
+        this._tree = buildTree(text);
+        if (this._tree.kind !== "ok") {
+            this._treeRows = [];
+            this._treeFocus = 0;
+            this.renderTree();
+            return;
+        }
+        const root = this._tree.root;
+        let focus: TreeNode;
+        if (from === "focus" && before) {
+            focus = nearestNode(root, before);
+        } else {
+            const model = this._editor.getModel();
+            const position = this._editor.getPosition();
+            focus = model && position ? nodeAtOffset(root, model.getOffsetAt(position)) : root;
+        }
+        // The root opens the first time; after that, what the user opened stays open.
+        if (this._treeExpanded.size === 0) {
+            this._treeExpanded.add(pathKey([]));
+        }
+        this._treeExpanded = expandTo(this._treeExpanded, focus);
+        this._treeRows = visibleRows(root, this._treeExpanded);
+        this._treeFocus = Math.max(0, this._treeRows.findIndex((r) => r.node === focus));
+        this.renderTree();
+        this.scrollTreeTo(this._treeFocus);
+    }
+
+    private closeTree(): void {
+        this._tree = undefined;
+        this._treeRows = [];
+        this._treeRowsBox?.replaceChildren();
+        this._treeView?.removeAttribute("aria-activedescendant");
+    }
+
+    /** The tree, or the message that stands in for it: a fault, or nothing yet. */
+    private renderTree(): void {
+        const tree = this._tree;
+        const ok = tree?.kind === "ok";
+        this._treeView.hidden = !ok;
+        this._treeMessage.hidden = ok;
+        if (tree && tree.kind === "faults") {
+            const first = tree.first;
+            const text = document.createElement("p");
+            text.textContent = this.text("Tree_Faults", this.say(said("Status_Position", String(first.line), String(first.column), this.problemText(first))));
+            const go = document.createElement("button");
+            go.type = "button";
+            go.className = "CodeEditor-tree-fault";
+            go.textContent = this.text("Tree_GoToFault");
+            go.addEventListener("click", () => {
+                this.setMode("edit");
+                this._editor.revealPositionInCenterIfOutsideViewport({ lineNumber: first.line, column: first.column });
+                this._editor.setPosition({ lineNumber: first.line, column: first.column });
+                this._editor.focus();
+            });
+            this._treeMessage.replaceChildren(text, go);
+        } else if (!ok) {
+            const text = document.createElement("p");
+            text.textContent = this.text("Tree_Empty");
+            this._treeMessage.replaceChildren(text);
+        }
+        this._treeRowsBox.style.height = `${this._treeRows.length * TREE_ROW_HEIGHT}px`;
+        this.renderTreeRows();
+        this.renderStatus();
+    }
+
+    /**
+     * Draw the rows in view, and only those (treeWindow.ts): a 1 MB document
+     * is forty thousand rows, and drawing them all took most of a second on
+     * the form (SPEC.md, the 1.6.9 probe, P1).
+     */
+    private renderTreeRows(): void {
+        if (this._mode !== "tree" || this._tree?.kind !== "ok") {
+            return;
+        }
+        const height = this._treeViewHeight || this._treeView.clientHeight;
+        const { first, end } = windowOf(this._treeView.scrollTop, height, TREE_ROW_HEIGHT, this._treeRows.length);
+        const drawn: HTMLElement[] = [];
+        for (let i = first; i < end; i++) {
+            drawn.push(this.treeRow(this._treeRows[i], i));
+        }
+        this._treeRowsBox.replaceChildren(...drawn);
+        const focused = this._treeRows[this._treeFocus];
+        if (focused) {
+            this._treeView.setAttribute("aria-activedescendant", this.treeRowId(this._treeFocus));
+        } else {
+            this._treeView.removeAttribute("aria-activedescendant");
+        }
+    }
+
+    private treeRowId(index: number): string {
+        return `${this._treeId}-${index}`;
+    }
+
+    /** One row: a twisty, the name, and the value or its count — named for a screen reader without the braces. */
+    private treeRow(row: Row, index: number): HTMLElement {
+        const node = row.node;
+        const item = document.createElement("div");
+        item.className = "CodeEditor-tree-row";
+        item.id = this.treeRowId(index);
+        item.setAttribute("role", "treeitem");
+        item.setAttribute("aria-level", String(row.level));
+        item.setAttribute("aria-setsize", String(row.setSize));
+        item.setAttribute("aria-posinset", String(row.posInSet));
+        item.setAttribute("aria-selected", index === this._treeFocus ? "true" : "false");
+        if (row.expanded !== undefined) {
+            item.setAttribute("aria-expanded", row.expanded ? "true" : "false");
+        }
+        item.style.top = `${index * TREE_ROW_HEIGHT}px`;
+        item.style.setProperty("--CodeEditor-tree-level", String(row.level - 1));
+        item.dataset.index = String(index);
+
+        const twisty = document.createElement("span");
+        twisty.className = "CodeEditor-tree-twisty";
+        twisty.setAttribute("aria-hidden", "true");
+        twisty.textContent = row.expanded === true ? "▾" : row.expanded === false ? "▸" : "";
+
+        const name = node.key === null ? "$" : String(node.key);
+        const key = document.createElement("span");
+        key.className = typeof node.key === "number" ? "CodeEditor-tree-key CodeEditor-tree-index" : "CodeEditor-tree-key";
+        key.textContent = name;
+
+        const value = document.createElement("span");
+        value.className = `CodeEditor-tree-value CodeEditor-tree--${node.type}`;
+        value.textContent = previewOf(node);
+
+        const spoken = node.type === "object"
+            ? this.text("Tree_Keys", String(node.count))
+            : node.type === "array" ? this.text("Tree_Items", String(node.count)) : value.textContent;
+        item.setAttribute("aria-label", `${name}: ${spoken}`);
+        const description = this.describeNode(node.path);
+        // The whole string where the row cut it, and what the schema says about the place.
+        item.title = [node.type === "string" ? JSON.stringify(node.value) : null, description].filter((s) => !!s).join("\n");
+        item.append(twisty, key, value);
+        return item;
+    }
+
+    /** What the schema in force says about a place: its description, else its title — plain text, never rendered. */
+    private describeNode(path: Segment[]): string | null {
+        const load = this._schema.kind === "loaded" ? this._schema.load : undefined;
+        if (!this._validate || this._language !== "json" || load?.state !== "ready") {
+            return null;
+        }
+        const schemas = schemasAt(load.schema, path);
+        const text = firstOf(schemas, "description") ?? firstOf(schemas, "title");
+        return typeof text === "string" && text.trim() !== "" ? text.trim() : null;
+    }
+
+    /** Move focus to row `index`, scrolled into view, and redraw. */
+    private focusTreeRow(index: number): void {
+        this._treeFocus = Math.max(0, Math.min(index, this._treeRows.length - 1));
+        this.scrollTreeTo(this._treeFocus);
+        this.renderTreeRows();
+        this.renderStatus();
+    }
+
+    private scrollTreeTo(index: number): void {
+        const height = this._treeViewHeight || this._treeView.clientHeight;
+        const top = scrollFor(index, this._treeView.scrollTop, height, TREE_ROW_HEIGHT);
+        if (top !== this._treeView.scrollTop) {
+            this._treeView.scrollTop = top;
+        }
+    }
+
+    /** Open or close nodes, keeping the focus where treeKeys.ts put it. */
+    private setExpanded(expanded: Set<string>, focus: number): void {
+        const tree = this._tree;
+        if (tree?.kind !== "ok") {
+            return;
+        }
+        this._treeExpanded = expanded;
+        this._treeRows = visibleRows(tree.root, expanded);
+        this._treeRowsBox.style.height = `${this._treeRows.length * TREE_ROW_HEIGHT}px`;
+        this.focusTreeRow(focus);
+    }
+
+    /** A key on the tree (treeKeys.ts); one the tree does not take goes on to the form untouched. */
+    private onTreeKey(e: KeyboardEvent): void {
+        const press = { key: e.key, ctrl: e.ctrlKey, meta: e.metaKey, alt: e.altKey };
+        if (this._treeRows.length === 0) {
+            return;
+        }
+        if (isTypeAhead(press)) {
+            const now = Date.now();
+            this._typed = (now - this._typedAt > TYPE_AHEAD_MS ? "" : this._typed) + e.key;
+            this._typedAt = now;
+            const index = typeAhead(this._treeRows, this._treeFocus, this._typed);
+            if (index >= 0) {
+                this.focusTreeRow(index);
+            }
+            e.preventDefault();
+            return;
+        }
+        // Text the user selected in the tree is theirs to copy: Ctrl+C is the browser's then.
+        const selection = this._container.ownerDocument.getSelection();
+        if ((press.ctrl || press.meta) && selection && !selection.isCollapsed && this._treeView.contains(selection.anchorNode)) {
+            return;
+        }
+        const height = this._treeViewHeight || this._treeView.clientHeight;
+        const result = treeKey(this._treeRows, this._treeFocus, this._treeExpanded, press, pageOf(height, TREE_ROW_HEIGHT));
+        if (!result.handled) {
+            return;
+        }
+        e.preventDefault();
+        if (result.expanded.size !== this._treeExpanded.size || [...result.expanded].some((k) => !this._treeExpanded.has(k))) {
+            this.setExpanded(result.expanded, result.focus);
+        } else {
+            this.focusTreeRow(result.focus);
+        }
+        if (result.action === "reveal") {
+            this.revealTreeRow(this._treeFocus);
+        } else if (result.action === "copy") {
+            this.copyTreePath();
+        }
+    }
+
+    /** A click on a row focuses it; on the twisty it also opens or closes the node. */
+    private onTreeClick(e: MouseEvent): void {
+        const item = (e.target as HTMLElement | null)?.closest<HTMLElement>(".CodeEditor-tree-row");
+        const index = item ? Number(item.dataset.index) : NaN;
+        if (!Number.isInteger(index)) {
+            return;
+        }
+        this._treeView.focus();
+        const row = this._treeRows[index];
+        if ((e.target as HTMLElement).classList.contains("CodeEditor-tree-twisty") && row?.expanded !== undefined) {
+            const next = new Set(this._treeExpanded);
+            const key = pathKey(row.node.path);
+            if (row.expanded) {
+                next.delete(key);
+            } else {
+                next.add(key);
+            }
+            this.setExpanded(next, index);
+            return;
+        }
+        this.focusTreeRow(index);
+    }
+
+    /** Back to the editor with the node's text selected: from its name to the end of its value. */
+    private revealTreeRow(index: number): void {
+        const node = this._treeRows[index]?.node;
+        const model = this._editor.getModel();
+        if (!node || !model) {
+            return;
+        }
+        const { start, end } = selectionOf(node);
+        this.setMode("edit");
+        const range = rangeOf(model, start, end);
+        this._editor.setSelection(range);
+        this._editor.revealRangeInCenterIfOutsideViewport(range);
+        this._editor.focus();
+    }
+
+    /** The focused node's path onto the clipboard (copy.ts), and a word in the strip either way. */
+    private copyTreePath(): void {
+        const node = this._treeRows[this._treeFocus]?.node;
+        if (!node) {
+            return;
+        }
+        const path = formatPath(node.path);
+        void copyText(path, this._container.ownerDocument).then((how) => {
+            this.announce(how ? this.text("Tree_Copied", path) : this.text("Tree_CopyFailed"));
+        });
+    }
+
+    /**
+     * Say something in the strip for a few seconds. Blanked first, so the
+     * same words twice are announced twice (`pcf-copy-field`'s finding).
+     */
+    private announce(message: string): void {
+        if (this._announceTimer !== undefined) {
+            window.clearTimeout(this._announceTimer);
+        }
+        this._announce.textContent = "";
+        this._announce.hidden = false;
+        window.setTimeout(() => {
+            this._announce.textContent = message;
+        }, 50);
+        this._announceTimer = window.setTimeout(() => {
+            this._announceTimer = undefined;
+            this._announce.textContent = "";
+            this._announce.hidden = true;
+        }, 3000);
     }
 
     /** A mode button pressed: switch, then move focus off the button that just hid. */
@@ -717,6 +1085,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._editorHost.style.height = view;
         this._diffHost.style.height = view;
         this._previewHost.style.height = view;
+        this._treeHost.style.height = view;
+        this._treeViewHeight = Math.max(0, size.height - STATUS_BAR_HEIGHT);
         return size;
     }
 
@@ -726,6 +1096,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         const box = { width: size.width, height: Math.max(0, size.height - STATUS_BAR_HEIGHT) };
         this._editor.layout(box);
         this._diffEditor?.layout(box);
+        // A taller box shows more rows: the window is drawn again for it.
+        this.renderTreeRows();
     }
 
     /* -------------------------------------------------------- validation */
@@ -902,6 +1274,47 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._previewHost.tabIndex = 0;
         this._previewHost.setAttribute("role", "region");
 
+        // 1.7.0: the tree takes the same box. The scroller is the one tab
+        // stop and holds focus; the rows are never focused themselves, so a
+        // row scrolled out of the window is never a lost focus — the scroller
+        // names the focused row with aria-activedescendant instead.
+        this._treeHost = document.createElement("div");
+        this._treeHost.className = "CodeEditor-tree";
+        this._treeHost.hidden = true;
+
+        this._treeView = document.createElement("div");
+        this._treeView.className = "CodeEditor-tree-view";
+        this._treeView.setAttribute("role", "tree");
+        this._treeView.tabIndex = 0;
+        this._treeRowsBox = document.createElement("div");
+        this._treeRowsBox.className = "CodeEditor-tree-rows";
+        this._treeView.append(this._treeRowsBox);
+        this._treeView.addEventListener("keydown", (e) => this.onTreeKey(e));
+        this._treeView.addEventListener("click", (e) => this.onTreeClick(e));
+        this._treeView.addEventListener("dblclick", (e) => {
+            const item = (e.target as HTMLElement | null)?.closest<HTMLElement>(".CodeEditor-tree-row");
+            if (item && !(e.target as HTMLElement).classList.contains("CodeEditor-tree-twisty")) {
+                this.revealTreeRow(Number(item.dataset.index));
+            }
+        });
+        this._treeView.addEventListener("scroll", () => this.renderTreeRows());
+
+        this._treeMessage = document.createElement("div");
+        this._treeMessage.className = "CodeEditor-tree-message";
+        this._treeMessage.hidden = true;
+        this._treeHost.append(this._treeView, this._treeMessage);
+
+        this._pathLabel = document.createElement("span");
+        this._pathLabel.className = "CodeEditor-path";
+        this._pathLabel.hidden = true;
+        // The tree already names each row as focus moves; the strip saying it
+        // again inside a status region would be read on every arrow.
+        this._pathLabel.setAttribute("aria-hidden", "true");
+
+        this._announce = document.createElement("span");
+        this._announce.className = "CodeEditor-announce";
+        this._announce.hidden = true;
+
         const modeButton = (onPress: () => void): HTMLButtonElement => {
             const button = document.createElement("button");
             button.type = "button";
@@ -916,14 +1329,20 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._backButton = modeButton(() => this.switchTo("edit", () => this._editor.focus()));
         this._previewButton = modeButton(() => this.switchTo("preview", () => this._editButton.focus()));
         this._editButton = modeButton(() => this.switchTo("edit", () => this._editor.focus()));
+        this._treeButton = modeButton(() => this.switchTo("tree", () => this._treeView.focus()));
+        // Copy path leaves focus on the tree, where the next node is a key away.
+        this._copyPathButton = modeButton(() => {
+            this.copyTreePath();
+            this._treeView.focus();
+        });
 
         // The buttons sit together at the strip's right end, Format last.
         const actions = document.createElement("span");
         actions.className = "CodeEditor-actions";
-        actions.append(this._changesButton, this._backButton, this._previewButton, this._editButton, this._formatButton);
+        actions.append(this._changesButton, this._backButton, this._previewButton, this._treeButton, this._copyPathButton, this._editButton, this._formatButton);
 
-        this._status.append(this._languageLabel, this._problemButton, this._okLabel, this._schemaLabel, actions);
-        this._root.append(this._editorHost, this._diffHost, this._previewHost, this._status);
+        this._status.append(this._languageLabel, this._problemButton, this._okLabel, this._schemaLabel, this._pathLabel, this._announce, actions);
+        this._root.append(this._editorHost, this._diffHost, this._previewHost, this._treeHost, this._status);
         this._container.appendChild(this._root);
     }
 
@@ -973,15 +1392,36 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         this._schemaLabel.title = this._schemaLabel.textContent;
         this._schemaLabel.classList.toggle("CodeEditor-schema--failed", !!schema?.failed);
 
-        // Which buttons this mode offers (strip.ts): Format as before, and
-        // 1.6.0's Changes, Preview and the two ways back.
+        // 1.7.0: in the tree the strip says where the focus is — the path
+        // Copy path would copy, and what the schema says about the place. A
+        // fault is the tree's own message there, so the problem slot rests.
+        const inTree = this._mode === "tree";
+        const focused = inTree ? this._treeRows[this._treeFocus]?.node : undefined;
+        if (inTree) {
+            this._problemButton.hidden = true;
+            this._okLabel.hidden = true;
+            this._schemaLabel.hidden = true;
+        }
+        this._pathLabel.hidden = !focused;
+        if (focused) {
+            const path = formatPath(focused.path);
+            const description = this.describeNode(focused.path);
+            this._pathLabel.textContent = description ? `${path} — ${description}` : path;
+            this._pathLabel.title = this._pathLabel.textContent;
+        }
+
+        // Which buttons this mode offers (strip.ts): Format as before,
+        // 1.6.0's Changes, Preview and the two ways back, and 1.7.0's Tree
+        // and Copy path.
         const buttons = stripButtons({
             mode: this._mode,
             language: this._language,
             readOnly: this._readOnly,
             validating,
             syntaxFault: this._syntaxFault,
-            differs: this._baseline.differs(this._editor?.getValue() ?? this._code ?? "")
+            differs: this._baseline.differs(this._editor?.getValue() ?? this._code ?? ""),
+            treeFocus: !!focused,
+            canCopy: this._canCopy
         });
         const show = (button: HTMLButtonElement, on: boolean, label: string, hint: string | null): void => {
             button.hidden = !on;
@@ -995,7 +1435,10 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         show(this._backButton, buttons.backToEditing, this.text("Status_BackToEditing"), null);
         show(this._previewButton, buttons.preview, this.text("Status_Preview"), this.text("Status_PreviewHint"));
         show(this._editButton, buttons.edit, this.text("Status_Edit"), null);
+        show(this._treeButton, buttons.tree, this.text("Status_Tree"), this.text("Status_TreeHint"));
+        show(this._copyPathButton, buttons.copyPath, this.text("Status_CopyPath"), this.text("Status_CopyPathHint"));
         this._previewHost.setAttribute("aria-label", this.text("Status_Preview"));
+        this._treeView.setAttribute("aria-label", this.text("Tree_Label"));
     }
 
     /** The problem the strip names: the first error, else the first warning. */

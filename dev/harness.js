@@ -78,6 +78,32 @@
         '}',
     ].join('\n');
 
+    /** 1.7.0: the same order, mended — the schema passes it, so the tree shows its descriptions. */
+    var VALID_ORDER = JSON.stringify({
+        id: 1042,
+        lines: [
+            { sku: 'PCF-001', qty: 2 },
+            { sku: 'PCF-002', qty: 1 },
+            { sku: 'odd sku', qty: 12 },
+        ],
+        status: 'open',
+    }, null, 2);
+
+    /**
+     * At least `chars` characters of indented JSON, shaped like the 1.6.9
+     * probe's (SPEC.md, P1): enough rows that only a window of them is drawn.
+     */
+    function largeJson(chars) {
+        var items = [];
+        var length = 0;
+        for (var i = 0; length < chars; i++) {
+            var item = { id: i, name: 'Item ' + i, active: i % 3 !== 0, tags: ['alpha', 't' + (i % 7)], address: { city: 'Springfield', geo: { lat: 39.78, lng: -89.65 } }, notes: i % 5 === 0 ? null : 'A note about item ' + i + '.' };
+            items.push(item);
+            length += JSON.stringify(item, null, 2).length + 6;
+        }
+        return JSON.stringify({ meta: { source: 'harness' }, items: items }, null, 2);
+    }
+
     /**
      * What each schema switch hands the control as `schema`, and how the
      * web-resource fetch answers — as measured on a form (SPEC.md P1–P2b): a
@@ -242,6 +268,7 @@
             schema: document.getElementById('harness-schema').value,
             metadata: document.getElementById('harness-metadata').value,
             markdownView: document.getElementById('harness-markdown-view').value,
+            jsonView: document.getElementById('harness-json-view').value,
         };
     }
 
@@ -263,6 +290,7 @@
                 // Blank is the property left unset: null, which is how the
                 // platform hands down an Enum nobody chose (the default applies).
                 markdownView: { raw: o.markdownView === '' ? null : o.markdownView, type: 'Enum' },
+                jsonView: { raw: o.jsonView === '' ? null : o.jsonView, type: 'Enum' },
             },
 
             /*
@@ -541,10 +569,23 @@
             document.getElementById('harness-language').value = 'markdown';
             mount();
         });
+        // 1.7.0. An order the schema passes, so the tree has descriptions
+        // to show; and a document as large as a column holds, for the window.
+        document.getElementById('harness-order').addEventListener('click', function () {
+            columnValue = VALID_ORDER;
+            document.getElementById('harness-language').value = 'json';
+            mount();
+        });
+        document.getElementById('harness-large').addEventListener('click', function () {
+            columnValue = largeJson(1000000);
+            document.getElementById('harness-language').value = 'json';
+            mount();
+        });
         document.getElementById('harness-save').addEventListener('click', save);
         document.getElementById('harness-script').addEventListener('click', script);
         // On the mounted control, as the hub's demo switches a preset.
         document.getElementById('harness-markdown-view').addEventListener('change', rerender);
+        document.getElementById('harness-json-view').addEventListener('change', rerender);
 
         status.textContent = 'Registered the control.';
 

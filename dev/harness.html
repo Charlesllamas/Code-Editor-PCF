@@ -236,6 +236,15 @@
             </label>
 
             <label>
+                Open JSON in
+                <select id="harness-json-view">
+                    <option value="">blank (edit)</option>
+                    <option value="edit">edit</option>
+                    <option value="tree">tree</option>
+                </select>
+            </label>
+
+            <label>
                 Strings
                 <select id="harness-strings">
                     <option value="1033">English (1033)</option>
@@ -259,6 +268,8 @@
             <button type="button" id="harness-fetchxml-faults">Put FetchXML with faults in the column</button>
             <button type="button" id="harness-break">Put a fault in the column</button>
             <button type="button" id="harness-markdown">Put Markdown in the column</button>
+            <button type="button" id="harness-order">Put a valid order in the column</button>
+            <button type="button" id="harness-large">Put 1 MB of JSON in the column</button>
             <button type="button" id="harness-save">Save the record</button>
             <button type="button" id="harness-script">A form script sets the column</button>
 

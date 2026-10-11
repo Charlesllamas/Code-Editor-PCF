@@ -176,7 +176,7 @@ for (const id of ["xml", "fetchxml"]) {
 // `"` opens the list on a key, `:` on a value; typing a word opens it too
 // (quickSuggestions, set per editor in index.ts). Enter takes a suggestion —
 // on a model-driven form Tab never reaches the editor (SPEC.md P3).
-function rangeOf(model: monaco.editor.ITextModel, start: number, end: number): monaco.Range {
+export function rangeOf(model: monaco.editor.ITextModel, start: number, end: number): monaco.Range {
     const a = model.getPositionAt(start);
     const b = model.getPositionAt(end);
     return new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column);

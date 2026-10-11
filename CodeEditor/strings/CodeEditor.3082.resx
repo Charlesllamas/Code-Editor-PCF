@@ -509,4 +509,52 @@
   <data name="Fetch_NotAnOption" xml:space="preserve">
     <value>{0} no es una opción de {1}.{2}</value>
   </data>
+  <data name="JsonView_Display_Key" xml:space="preserve">
+    <value>Abrir JSON en</value>
+  </data>
+  <data name="JsonView_Desc_Key" xml:space="preserve">
+    <value>Si una columna JSON se abre como texto para editar o como un árbol para explorar. La barra inferior cambia entre los dos en ambos casos. Los demás lenguajes lo ignoran.</value>
+  </data>
+  <data name="JsonView_Edit_Key" xml:space="preserve">
+    <value>Edición</value>
+  </data>
+  <data name="JsonView_Tree_Key" xml:space="preserve">
+    <value>Árbol</value>
+  </data>
+  <data name="Status_Tree" xml:space="preserve">
+    <value>Árbol</value>
+  </data>
+  <data name="Status_TreeHint" xml:space="preserve">
+    <value>Explorar el JSON como un árbol. Entrar en un nodo vuelve a su texto.</value>
+  </data>
+  <data name="Status_CopyPath" xml:space="preserve">
+    <value>Copiar ruta</value>
+  </data>
+  <data name="Status_CopyPathHint" xml:space="preserve">
+    <value>Copiar la ruta a este nodo, como $.items[2].name (Ctrl+C)</value>
+  </data>
+  <data name="Tree_Label" xml:space="preserve">
+    <value>Árbol JSON</value>
+  </data>
+  <data name="Tree_Empty" xml:space="preserve">
+    <value>Todavía no hay nada que mostrar.</value>
+  </data>
+  <data name="Tree_Faults" xml:space="preserve">
+    <value>No hay árbol mientras el JSON tenga un error. {0}</value>
+  </data>
+  <data name="Tree_GoToFault" xml:space="preserve">
+    <value>Ir al error</value>
+  </data>
+  <data name="Tree_Copied" xml:space="preserve">
+    <value>Copiado {0}</value>
+  </data>
+  <data name="Tree_CopyFailed" xml:space="preserve">
+    <value>El navegador no permitió copiar. La ruta está en la barra para seleccionarla y copiarla.</value>
+  </data>
+  <data name="Tree_Items" xml:space="preserve">
+    <value>{0} elementos</value>
+  </data>
+  <data name="Tree_Keys" xml:space="preserve">
+    <value>{0} claves</value>
+  </data>
 </root>

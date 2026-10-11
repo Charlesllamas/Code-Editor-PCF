@@ -15,7 +15,8 @@
     "bump": "node scripts/version.mjs",
     "release": "node scripts/release.mjs",
     "shots": "node dev/shots.mjs",
-    "demo-check": "node dev/demo-check.js"
+    "demo-check": "node dev/demo-check.js",
+    "keys": "node dev/keys-walk.js"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
