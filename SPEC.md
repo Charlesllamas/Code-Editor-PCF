@@ -1142,7 +1142,77 @@ events.
   copy, and the focus goes back to the tree after the scratch textarea.
 - **P4 — canvas, not asked.** Left for the 1.7.0 canvas walkthrough.
 
+## What building 1.7.0 found
+
+- **Packed bundle 4,390,063 bytes**, +16,375 on 1.6.1 (4,373,688): three
+  pure modules, the tree's DOM in `index.ts`, and `copy.ts`. No new
+  dependency — jsonc-parser was already in.
+- **Opening the tree is one parse, moving is not.** On 1.27 MB of JSON in the
+  harness, Tree took 106–131 ms (the strict check, `parseTree`, the
+  conversion and the first window); after that every key took 1–3 ms with
+  about 22 rows drawn.
+- **jsonc-parser reports a trailing comma at the brace after it**: `{ "a": 1, }`
+  is a fault at column 11, not 10. The suite asserts the measured column.
+- **In the hub's demo frame the policy refuses `clipboard-write` and Copy path
+  still copies** — the fallback, as `pcf-copy-field` found for its own copy
+  (local harness on port 4174, headless Chrome, 2026-10-11: *Copied $.id*).
+- **`demo-check`: ten of ten presets clean**, the new *JSON, as a tree*
+  among them; `validate_manifest` valid, no warnings.
+- **A screenshot's walk is real input to a pure function, not to a person.**
+  The first `tree` shot walked into the wrong node because a preset document
+  changed under its key list; the shot is checked by looking at it, which is
+  what found that.
+
+## The 1.7.0 walkthrough (the test environment, account Information form, Grid tab, 2026-10-11)
+
+Imported with `pac solution import --publish-changes` over 1.6.9 (101 s);
+`customcontrols` read back 1.7.0. A temporary second editor was bound on
+`cll_editor2` (`ppdev form control bind`, `language=json`, `jsonView=tree`,
+`validation=on`), a test order written to it through the Web API, and both
+taken away afterwards. Driven in the desktop app's browser pane with real
+clicks and keys.
+
+- **W1 — `jsonView=tree` opens in the tree.** The order mounted as
+  `$: 4 keys` over `id`, `lines`, `status`, `odd key`; the strip *JSON | $ |
+  Copy path | Edit*.
+- **W2 — two editors keep their own ids.** The FetchXML editor on `cll_code`
+  and the JSON one on `cll_editor2`: `CodeEditor-tree-1-…` and
+  `CodeEditor-tree-2-0`.
+- **W3 — the keys, pressed.** A click on the first row, then ↓ ↓ → → → →:
+  `sku: "PCF-001"`, level 4, 1 of 2, the strip *$.lines[0].sku*. End, Home,
+  then `o`: `odd key: true`. The record stayed *Saved* throughout.
+- **W4 — Ctrl+C copies the path.** The strip *Copied $['odd key']*, and the
+  pane reported the write reaching the operating system's clipboard.
+- **W5 — Enter goes back to the text.** The editor took focus with exactly
+  `"odd key": true` selected (line 18); Tree again reopened on `odd key`.
+- **W6 — a form script under the open tree.** `setValue` with a new first
+  line: the tree rebuilt in place and kept the focus *by path* —
+  `$.lines[0].sku` now names the new line's `sku: "NEW"`, eleven rows on show.
+- **W7 — a locked field keeps its tree.** `setDisabled(true)`: the tree stayed,
+  with Copy path and Edit.
+- The script's change was discarded (the form's *Unsaved changes* prompt,
+  Discard), the column cleared, and the binding removed.
+
 ## Not verified
+
+From 1.7.0:
+
+- **The tree in a canvas app** (P4 of the 1.6.9 probe, and the walkthrough):
+  keys, Copy path and Enter inside the player's nested frame.
+- **A screen reader.** The rows carry `aria-level`, `aria-setsize`,
+  `aria-posinset`, `aria-expanded` and an `aria-label` per row, and the
+  scroller names the focused row with `aria-activedescendant`; nobody has
+  listened to it with Narrator or NVDA.
+- **Which clipboard path a desktop Edge or Chrome takes.** The pane's
+  Chromium refused the API every time and `execCommand` wrote; either way
+  the text lands, but the first path is unmeasured outside it.
+- **Schema descriptions from a web resource on a form.** The test
+  environment's `cll_/probe/order.schema.json` has none; the harness showed
+  them from an inline schema, and both arrive as the same loaded schema.
+- **Spanish on the form, and phone width on the form.** Both in the harness
+  only (the strip fits at 340 px there).
+- **The live hub demo.** `demo-check` ran every preset in the hub's harness
+  locally; `demo-check --live` waits for the release to be published.
 
 From the 1.5.9 probe:
 
