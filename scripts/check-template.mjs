@@ -849,13 +849,37 @@ const fidelity = manifest.demo?.fidelity;
 // "clean checkout has not built yet" case to exempt. A typo costs the whole
 // demo: the hub notes it in an ingestion run nobody is watching and the control
 // renders no rows.
-const datasetFixture = manifest.demo?.datasetFixture;
+//
+// There can be more than one. A preset may name a fixture of its own
+// (`presets[].datasetFixture`, pcfhub's docs/demo-harness-preset-fixtures.md,
+// 2026-10-12) in place of the demo's: which column a role is bound to is the
+// column's `alias` in the fixture, so a preset that shows another binding
+// needs another file. Each path is checked once, under the key that first
+// names it, as the hub reads it once however many presets share it. Whether
+// a path is a safe one is the hub's rule, reported by JSON Pointer, so
+// anything here that is not a string is left to it.
+const fixtures = new Map();
 
-if (datasetFixture && !exists(join(root, datasetFixture))) {
-    problems.push(
-        `pcfhub.json names demo.datasetFixture as "${datasetFixture}", which does not exist.`,
-    );
-} else if (datasetFixture) {
+for (const [key, path] of [
+    ['demo.datasetFixture', manifest.demo?.datasetFixture],
+    ...(Array.isArray(manifest.demo?.presets) ? manifest.demo.presets : []).map(
+        (preset, index) => [`demo.presets[${index}].datasetFixture`, preset?.datasetFixture],
+    ),
+]) {
+    if (typeof path === 'string' && path.trim() !== '' && !fixtures.has(path)) {
+        fixtures.set(path, key);
+    }
+}
+
+for (const [datasetFixture, fixtureKey] of fixtures) {
+    if (!exists(join(root, datasetFixture))) {
+        problems.push(
+            `pcfhub.json names ${fixtureKey} as "${datasetFixture}", which does not exist.`,
+        );
+
+        continue;
+    }
+
     /*
      * What the file must hold depends on who reads it — the hub's
      * DemoFixtureShape, mirrored: a dataset control or a grid host indexes
@@ -865,6 +889,7 @@ if (datasetFixture && !exists(join(root, datasetFixture))) {
      * `services` list, canned answers for an external service it declares
      * (docs/demo-harness-service-answers.md, 2026-09-29) — one or both. The
      * hub refuses the wrong shape at ingestion and says so only on the run.
+     * A preset's own file is a whole fixture, held to the same shape.
      */
     const needsRows = manifest.control?.type === 'dataset' || (manifest.demo?.host ?? 'form') === 'grid';
     let fixture = null;
@@ -872,24 +897,24 @@ if (datasetFixture && !exists(join(root, datasetFixture))) {
     try {
         fixture = JSON.parse(readFileSync(join(root, datasetFixture), 'utf8'));
     } catch (error) {
-        problems.push(`demo.datasetFixture "${datasetFixture}" is not valid JSON: ${error.message}`);
+        problems.push(`${fixtureKey} "${datasetFixture}" is not valid JSON: ${error.message}`);
     }
 
     const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 
     if (fixture !== null && !isObject(fixture)) {
-        problems.push(`demo.datasetFixture "${datasetFixture}" must be a JSON object.`);
+        problems.push(`${fixtureKey} "${datasetFixture}" must be a JSON object.`);
     } else if (fixture !== null && 'services' in fixture && !Array.isArray(fixture.services)) {
-        problems.push(`demo.datasetFixture "${datasetFixture}" must have services as an array of canned answers.`);
+        problems.push(`${fixtureKey} "${datasetFixture}" must have services as an array of canned answers.`);
     } else if (fixture !== null && needsRows) {
         for (const key of ['columns', 'records']) {
             if (!Array.isArray(fixture[key])) {
-                problems.push(`demo.datasetFixture "${datasetFixture}" must have a ${key} array — the hub reads it as rows for this control.`);
+                problems.push(`${fixtureKey} "${datasetFixture}" must have a ${key} array — the hub reads it as rows for this control.`);
             }
         }
     } else if (fixture !== null && !isObject(fixture.dataverse) && !Array.isArray(fixture.services)) {
         problems.push(
-            `demo.datasetFixture "${datasetFixture}" must have a dataverse object or a services array — a ` +
+            `${fixtureKey} "${datasetFixture}" must have a dataverse object or a services array — a ` +
             'control without a dataset property reads nothing else from it.',
         );
     }

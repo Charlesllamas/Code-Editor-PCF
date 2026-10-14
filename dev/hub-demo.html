@@ -179,12 +179,40 @@
                     libraries[lib.getAttribute('name')] = lib.getAttribute('version');
                 });
 
-                var fixture = hub.demo.datasetFixture ? JSON.parse(await text('../' + hub.demo.datasetFixture)) : null;
+                /*
+                 * The fixture a preset is shown over: its own where it names
+                 * one (`presets[].datasetFixture`), the demo's otherwise —
+                 * the hub's ManifestDemo::fixturePathFor. Read once per file,
+                 * as the hub does. Until 2026-10-12 every preset was handed
+                 * the demo's, so a preset with its own showed the wrong rows
+                 * here and the right ones live.
+                 */
+                var fixtureFiles = {};
+                var fixtureOf = async function (p) {
+                    var path = (p && p.datasetFixture) || hub.demo.datasetFixture;
+
+                    if (!path) {
+                        return null;
+                    }
+
+                    if (!(path in fixtureFiles)) {
+                        fixtureFiles[path] = JSON.parse(await text('../' + path));
+                    }
+
+                    return fixtureFiles[path];
+                };
                 var presets = hub.demo.presets || [];
+                var presetFixtures = [];
+
+                for (var each of presets) {
+                    presetFixtures.push(await fixtureOf(each));
+                }
+
                 var preset = presets.find(function (p) { return p.slug === params.get('preset'); })
                     || presets.find(function (p) { return p.isDefault; })
                     || presets[0]
                     || { slug: '(none)', props: {} };
+                var fixture = await fixtureOf(preset);
                 var dataset = properties.find(function (p) { return p.kind === 'dataset'; });
                 var state = preset.state || {};
                 var domains = Array.prototype.map.call(xml.querySelectorAll('external-service-usage[enabled="true"] domain'), function (d) {
@@ -204,8 +232,8 @@
                     properties: properties,
                     outputs: properties.filter(function (p) { return p.kind === 'bound'; }).map(function (p) { return { name: p.name, ofType: p.ofType }; }),
                     featureUsage: Array.prototype.map.call(xml.querySelectorAll('feature-usage uses-feature'), function (f) { return f.getAttribute('name'); }),
-                    presets: presets.map(function (p) {
-                        return { slug: p.slug, name: p.name, props: p.props || {}, isDefault: !!p.isDefault, datasetFixture: fixture, state: p.state || null };
+                    presets: presets.map(function (p, index) {
+                        return { slug: p.slug, name: p.name, props: p.props || {}, isDefault: !!p.isDefault, datasetFixture: presetFixtures[index], state: p.state || null };
                     }),
                     platformLibraries: Object.keys(libraries).length ? libraries : null,
                     fidelity: hub.demo.fidelity,
