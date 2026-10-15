@@ -4,18 +4,21 @@
  * pressed reached the control on a form, and the form acted on none of them
  * (SPEC.md, the 1.6.9 probe, P2), so the map is the pattern's whole set.
  *
+ * The map itself lives in the template's shared `lib/tree-keys` since
+ * 2026-10-15 — lifted from this file — and this one adapts the JSON tree to
+ * it: a row's id is its path key, its name is what type-ahead matches, and
+ * the ids the map names to open and close are applied to the expanded set
+ * here, so `index.ts` and the suite keep the shape they had.
+ *
  * Pure, so the suite loads it from source; `index.ts` hands it a key and
  * applies what comes back.
  */
 
-import { Row, opens, pathKey } from "./jsonTree";
+import { Row, pathKey } from "./jsonTree";
+import { Press, TreeRow, parentIndex, treeKey as sharedTreeKey } from "./lib/tree-keys/keys";
+import { isTypeAhead, typeAhead as sharedTypeAhead } from "./lib/tree-keys/typeAhead";
 
-export interface Press {
-    key: string;
-    ctrl?: boolean;
-    meta?: boolean;
-    alt?: boolean;
-}
+export { Press, isTypeAhead };
 
 export type TreeAction = "reveal" | "copy";
 
@@ -27,15 +30,20 @@ export interface KeyResult {
     handled: boolean;
 }
 
+/** A row's name as type-ahead matches it: the property name or index, lower-cased. */
+export function rowName(row: Row): string {
+    const key = row.node.key;
+    return key === null ? "$" : String(key).toLowerCase();
+}
+
+/** The JSON tree's rows as the shared map reads them. */
+export function asTreeRows(rows: Row[]): TreeRow[] {
+    return rows.map((row) => ({ id: pathKey(row.node.path), level: row.level, expanded: row.expanded, name: rowName(row) }));
+}
+
 /** The row above `index` one level up, or -1 at the root. */
 export function parentRow(rows: Row[], index: number): number {
-    const level = rows[index]?.level ?? 1;
-    for (let i = index - 1; i >= 0; i--) {
-        if (rows[i].level === level - 1) {
-            return i;
-        }
-    }
-    return -1;
+    return parentIndex(asTreeRows(rows), index);
 }
 
 /**
@@ -44,84 +52,12 @@ export function parentRow(rows: Row[], index: number): number {
  * comes back unhandled, with nothing changed.
  */
 export function treeKey(rows: Row[], focus: number, expanded: ReadonlySet<string>, press: Press, page = 10): KeyResult {
-    const same = (): KeyResult => ({ focus, expanded: new Set(expanded), handled: false });
-    if (rows.length === 0) {
-        return same();
-    }
-    const at = Math.max(0, Math.min(focus, rows.length - 1));
-    const row = rows[at];
-    const to = (index: number): KeyResult => ({ focus: Math.max(0, Math.min(index, rows.length - 1)), expanded: new Set(expanded), handled: true });
-    const toggled = (open: boolean): KeyResult => {
-        const next = new Set(expanded);
-        const key = pathKey(row.node.path);
-        if (open) {
-            next.add(key);
-        } else {
-            next.delete(key);
-        }
-        return { focus: at, expanded: next, handled: true };
-    };
-
-    if (press.ctrl || press.meta) {
-        // Ctrl+C (Cmd+C) copies the focused node's path; every other shortcut is the host's.
-        return !press.alt && press.key.toLowerCase() === "c" ? { ...to(at), action: "copy" } : same();
-    }
-    if (press.alt) {
-        return same();
-    }
-
-    switch (press.key) {
-        case "ArrowDown":
-            return to(at + 1);
-        case "ArrowUp":
-            return to(at - 1);
-        case "Home":
-            return to(0);
-        case "End":
-            return to(rows.length - 1);
-        case "PageDown":
-            return to(at + Math.max(1, page));
-        case "PageUp":
-            return to(at - Math.max(1, page));
-        case "ArrowRight":
-            if (row.expanded === false) {
-                return toggled(true);
-            }
-            if (row.expanded === true) {
-                return to(at + 1);
-            }
-            return to(at);
-        case "ArrowLeft":
-            if (row.expanded === true) {
-                return toggled(false);
-            }
-            {
-                const parent = parentRow(rows, at);
-                return to(parent >= 0 ? parent : at);
-            }
-        case "Enter":
-            return { ...to(at), action: "reveal" };
-        case "*": {
-            // Every sibling that can open, opens; focus stays put.
-            const parent = parentRow(rows, at);
-            const siblings = parent >= 0 ? rows[parent].node.children : [row.node];
-            const next = new Set(expanded);
-            siblings.filter(opens).forEach((n) => next.add(pathKey(n.path)));
-            return { focus: at, expanded: next, handled: true };
-        }
-        case " ":
-            // Selection follows focus, so Space has nothing to select; taken
-            // anyway, or the tree's own scroller jumps a page under the focus.
-            return to(at);
-        default:
-            return same();
-    }
-}
-
-/** A row's name as type-ahead matches it: the property name or index, lower-cased. */
-export function rowName(row: Row): string {
-    const key = row.node.key;
-    return key === null ? "$" : String(key).toLowerCase();
+    const result = sharedTreeKey(asTreeRows(rows), focus, press, page);
+    const next = new Set(expanded);
+    result.open.forEach((id) => next.add(id));
+    result.close.forEach((id) => next.delete(id));
+    const action: TreeAction | undefined = result.action === "activate" ? "reveal" : result.action;
+    return { focus: result.focus, expanded: next, handled: result.handled, ...(action ? { action } : {}) };
 }
 
 /**
@@ -130,21 +66,5 @@ export function rowName(row: Row): string {
  * the buffer grows, wrapping round. -1 when nothing matches.
  */
 export function typeAhead(rows: Row[], focus: number, buffer: string): number {
-    if (rows.length === 0 || buffer === "") {
-        return -1;
-    }
-    const wanted = buffer.toLowerCase();
-    const start = wanted.length === 1 ? focus + 1 : focus;
-    for (let i = 0; i < rows.length; i++) {
-        const index = (start + i) % rows.length;
-        if (rowName(rows[index]).startsWith(wanted)) {
-            return index;
-        }
-    }
-    return -1;
-}
-
-/** Whether a key is a printable character for type-ahead: one character, no shortcut held. */
-export function isTypeAhead(press: Press): boolean {
-    return !press.ctrl && !press.meta && !press.alt && [...press.key].length === 1 && press.key !== " " && press.key !== "*";
+    return sharedTypeAhead(asTreeRows(rows), focus, buffer);
 }

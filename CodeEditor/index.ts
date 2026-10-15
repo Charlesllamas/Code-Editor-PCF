@@ -20,15 +20,13 @@ import { JsonView, MarkdownView, Mode, initialMode, readJsonView, readMarkdownVi
 import { renderPreview } from "./preview";
 import { Row, Segment, Tree, TreeNode, buildTree, expandTo, formatPath, nearestNode, nodeAtOffset, pathKey, previewOf, selectionOf, visibleRows } from "./jsonTree";
 import { isTypeAhead, treeKey, typeAhead } from "./treeKeys";
+import { Buffer, nextBuffer } from "./lib/tree-keys/typeAhead";
 import { pageOf, scrollFor, windowOf } from "./treeWindow";
 import { canCopy, copyText } from "./copy";
 import { firstOf, schemasAt } from "./schemaNav";
 
 /** 1.7.0: every tree row is this tall, so the window of rows drawn is arithmetic (treeWindow.ts). */
 const TREE_ROW_HEIGHT = 22;
-
-/** Type-ahead keeps adding to its search while the keys come this close together. */
-const TYPE_AHEAD_MS = 500;
 
 /** Each control's tree rows need ids no other editor on the form uses: aria-activedescendant names one. */
 let treeIds = 0;
@@ -158,8 +156,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
     private readonly _treeId = `CodeEditor-tree-${++treeIds}`;
     /** The tree's visible height, as sizeContainer set it — clientHeight is 0 on a tab not yet shown. */
     private _treeViewHeight = 0;
-    private _typed = "";
-    private _typedAt = 0;
+    /** Type-ahead's search so far (lib/tree-keys: it grows while the keys come within 500 ms). */
+    private _typed: Buffer | null = null;
     private _announceTimer: number | undefined;
     private _canCopy = true;
 
@@ -802,9 +800,8 @@ export class CodeEditor implements ComponentFramework.StandardControl<IInputs, I
         }
         if (isTypeAhead(press)) {
             const now = Date.now();
-            this._typed = (now - this._typedAt > TYPE_AHEAD_MS ? "" : this._typed) + e.key;
-            this._typedAt = now;
-            const index = typeAhead(this._treeRows, this._treeFocus, this._typed);
+            this._typed = nextBuffer(this._typed, e.key, now);
+            const index = typeAhead(this._treeRows, this._treeFocus, this._typed.text);
             if (index >= 0) {
                 this.focusTreeRow(index);
             }
