@@ -798,6 +798,58 @@ for (const controlDir of controlDirs) {
                 }
             }
         }
+
+        /*
+         * The rig's English table — `var STRINGS = { … }` in dev/host.js, what
+         * the harness page and the screenshots read — is a hand copy of 1033,
+         * and nothing compared the two. `pcf-row-commands` fell 35 keys behind
+         * over two releases, the harness drew those as raw resx keys, and only
+         * a screenshot showed it (2026-10-16). The suite never notices by
+         * design: it passes a getString of its own. A warning, because only
+         * the harness is wrong.
+         */
+        const hostFile = [join(root, 'dev', controlDir.split(/[\\/]/).pop(), 'host.js'), join(root, 'dev', 'host.js')].find(exists);
+        const hostText = hostFile ? readFileSync(hostFile, 'utf8').replace(/\r\n/g, '\n') : '';
+        const tableAt = hostText.indexOf('    var STRINGS = {\n');
+
+        if (tableAt !== -1) {
+            const table = hostText.slice(tableAt, hostText.indexOf('\n    };\n', tableAt));
+            const copied = new Map(
+                [...table.matchAll(/^\s+([A-Za-z0-9_]+):\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'),?$/gm)].map((match) => {
+                    const literal = match[2];
+                    let value = null;
+
+                    try {
+                        value = literal.startsWith('"') ? JSON.parse(literal) : JSON.parse(`"${literal.slice(1, -1).replace(/\\'/g, "'").replace(/"/g, '\\"')}"`);
+                    } catch {
+                        value = null;
+                    }
+
+                    return [match[1], value];
+                }),
+            );
+            const decode = (text) => text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+            // Only the keys the control's own code names: a property's display name and
+            // description are the manifest's, never drawn by the harness, so their absence is fine.
+            const source = [...walk(join(root, controlDir))]
+                .filter((path) => /\.tsx?$/.test(path) && !/[\\/]generated[\\/]/.test(path))
+                .map((path) => readFileSync(path, 'utf8'))
+                .join('\n');
+            const asked = (key) => new RegExp(`['"\`]${key}['"\`]`).test(source);
+            const absent = [...base.keys()].filter((key) => asked(key) && !copied.has(key));
+            const stale = [...base.entries()].filter(([key, value]) => asked(key) && copied.has(key) && copied.get(key) !== null && copied.get(key) !== decode(value)).map(([key]) => key);
+            const where = hostFile.slice(root.length + 1).replace(/\\/g, '/');
+
+            if (absent.length > 0 || stale.length > 0) {
+                warnings.push(
+                    `${where}'s English strings for the harness have fallen behind ${baseName}: ` +
+                        [absent.length > 0 ? `${absent.length} missing (${absent.slice(0, 6).join(', ')}${absent.length > 6 ? ', …' : ''})` : '',
+                            stale.length > 0 ? `${stale.length} worded differently (${stale.slice(0, 6).join(', ')}${stale.length > 6 ? ', …' : ''})` : '']
+                            .filter(Boolean).join(' and ') +
+                        `. The harness and the screenshots draw a missing one as its key. Rebuild the STRINGS table from the resx.`,
+                );
+            }
+        }
     }
 }
 
