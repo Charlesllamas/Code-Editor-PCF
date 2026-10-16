@@ -232,6 +232,24 @@ async function checkLive(chrome, preset, first) {
                 + `\n  and npm run dev:demo-harness in ../pcfhub for the harness itself (or --live for pcfhub.dev).\n`);
             process.exit(1);
         }
+
+        /*
+         * **And it has to be this repository.** `dev/serve.js` takes the next
+         * free port when its own is taken, so a harness left running for
+         * another control keeps 8181 and this run reads *that* control's page:
+         * every preset name falls back to its default preset and every one
+         * reports clean. On 2026-10-16 four controls' runs were Code Editor's,
+         * all "ok", before a 336-pixel-high star rating gave it away.
+         */
+        const served = await fetch(`http://localhost:${port}/pcfhub.json`)
+            .then((response) => (response.ok ? response.json() : null))
+            .catch(() => null);
+
+        if (!served || served.slug !== hub.slug) {
+            console.error(`\n  http://localhost:${port} serves ${served ? served.slug : 'no pcfhub.json'}, not ${hub.slug} — a harness from`
+                + `\n  another repository holds the port. Stop it, or serve this one on a free port and pass --port.\n`);
+            process.exit(1);
+        }
     }
 
     fs.mkdirSync(out, { recursive: true });
