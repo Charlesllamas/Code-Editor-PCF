@@ -6,6 +6,7 @@
  *                                           #   here, and npm run dev:demo-harness in ../pcfhub
  *     npm run demo-check -- --live          # https://pcfhub.dev/components/<slug>, as a visitor sees it
  *     npm run demo-check -- --preset week --width 373 --theme dark
+ *     npm run demo-check -- --live --theme dark --device phone
  *
  * For each preset in `pcfhub.json` it picks the preset, waits for the
  * control, and reads inside the sandboxed frame: whether the document
@@ -14,6 +15,12 @@
  * the harness reported an error, and what the control threw or logged as an
  * error. A picture of each lands in `out/demo-check/`, which `out/` keeps out
  * of git. Exits non-zero when any preset has a problem.
+ *
+ * **On the live page the hub sizes and themes the frame**, from its own
+ * Desktop/Tablet/Phone and Light/Dark radios: `--theme` and `--device` press
+ * them, and `--width` (the stand-in's frame) does not apply. Until
+ * `pcf-hierarchy-view` 0.3.3 both were ignored there, so a "dark" or
+ * "phone" live run was the light desktop one again, reported clean.
  *
  * **Why it exists.** The hub's demo is a third host — it changes inputs on a
  * mounted control, narrows it below the window, sizes its frame to the height
@@ -47,6 +54,11 @@ const harness = option('harness', 'http://localhost:4174');
 const theme = option('theme', 'light');
 const out = path.resolve(root, option('out', 'out/demo-check'));
 const site = option('site', 'https://pcfhub.dev');
+const device = option('device', 'desktop');
+const DEVICES = { desktop: 'Desktop', tablet: 'Tablet', phone: 'Phone' };
+const THEMES = { light: 'Light', dark: 'Dark' };
+/** A non-default theme or device names its pictures, so one run does not overwrite another. */
+const suffix = [theme !== 'light' ? theme : '', device !== 'desktop' ? device : ''].filter(Boolean).map((part) => `-${part}`).join('');
 
 /** Read inside the demo frame: the document against its frame, and what is on screen. */
 const MEASURE = `(() => {
@@ -140,6 +152,25 @@ async function checkLive(chrome, preset, first) {
         await sleep(8000);
     }
 
+    // The theme and the device are the page's radios; pressed before every preset, and read back.
+    const set = await chrome.evaluate(`(async () => {
+        const wanted = ${JSON.stringify([THEMES[theme], DEVICES[device]])};
+        for (const label of wanted) {
+            const radio = document.querySelector('button[role=radio][aria-label="' + label + '"]');
+            if (!radio) return 'no ' + label + ' button on the page';
+            if (radio.getAttribute('aria-checked') !== 'true') {
+                radio.click();
+                await new Promise((r) => setTimeout(r, 600));
+            }
+            if (radio.getAttribute('aria-checked') !== 'true') return label + ' did not take';
+        }
+        return 'ok';
+    })()`);
+
+    if (set !== 'ok') {
+        return { measure: null, errors: [set] };
+    }
+
     const picked = await chrome.evaluate(`(async () => {
         const button = document.querySelector('button[aria-label="Preset"]');
         if (!button) return 'no Preset list on the page';
@@ -180,6 +211,19 @@ async function checkLive(chrome, preset, first) {
         process.exit(1);
     }
 
+    if (!(theme in THEMES) || !(device in DEVICES)) {
+        console.error(`\n  --theme is ${Object.keys(THEMES).join(' or ')}, --device ${Object.keys(DEVICES).join(', ')}.\n`);
+        process.exit(1);
+    }
+
+    if (live && process.argv.includes('--width')) {
+        console.warn('\n  --width sizes the stand-in\'s frame; on the live page the hub sizes it — pass --device desktop|tablet|phone.');
+    }
+
+    if (!live && device !== 'desktop') {
+        console.warn('\n  --device is the live page\'s; the stand-in takes --width.');
+    }
+
     if (!live) {
         try {
             await fetch(`http://localhost:${port}/dev/hub-demo.html`);
@@ -195,12 +239,12 @@ async function checkLive(chrome, preset, first) {
     const chrome = await launch({ width: Math.max(1280, width + 200), height: 1000 });
     let bad = 0;
 
-    console.log(`\n  ${hub.slug} — ${live ? `${site}/components/${hub.slug}` : `dev/hub-demo.html in ${harness}`}, ${chosen.length} preset(s)\n`);
+    console.log(`\n  ${hub.slug} — ${live ? `${site}/components/${hub.slug}, ${theme}, ${device}` : `dev/hub-demo.html in ${harness}, ${theme}, ${width}px`}, ${chosen.length} preset(s)\n`);
 
     try {
         for (let i = 0; i < chosen.length; i += 1) {
             const preset = chosen[i];
-            const picture = path.join(out, `${preset.slug}${live ? '-live' : ''}.png`);
+            const picture = path.join(out, `${preset.slug}${live ? '-live' : ''}${suffix}.png`);
             let result;
 
             chrome.takeProblems();
