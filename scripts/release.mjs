@@ -26,7 +26,7 @@
  * -----
  *     npm run release -- --draft     write .release-notes.md from the log
  *     npm run release                tag from .release-notes.md
- *     npm run release -- --push      …and push the tag
+ *     npm run release -- --push      …and push the tag (refused while the branch is unpushed)
  *     npm run release -- --dry-run   print the command it would run
  *
  * The draft is a starting point, not an output: it lists the commits since the
@@ -81,6 +81,32 @@ if (git(['tag', '-l', tag]).trim() === tag) {
         `${tag} already exists locally. To replace it: git tag -d ${tag} && git push --delete origin ${tag},\n` +
         '  then re-run. The release body is replaced rather than appended when the workflow re-runs.',
     );
+}
+
+/*
+ * The tag gives the hub the release notes and the manifest; the default
+ * branch gives it the docs, pcfhub.json, the media it names and the demo
+ * fixture. `--push` sends the tag alone, so a release whose commits the
+ * branch has not seen reaches the hub beside the last release's pages.
+ * Read from the last fetch or push — nothing is fetched here.
+ */
+if (push && !force) {
+    const ahead = commitsAheadOfUpstream();
+
+    if (ahead === null) {
+        fail(
+            'The branch has no upstream, so nothing shows the hub can read this release\'s docs and\n' +
+            '  pcfhub.json. Push the branch first (git push -u origin <branch>), then re-run; or --force.',
+        );
+    }
+
+    if (ahead > 0) {
+        fail(
+            `The branch is ${ahead} commit(s) ahead of its upstream. --push sends the tag alone, and the hub\n` +
+            '  reads the docs, pcfhub.json, its media and the fixture from the default branch. Push the\n' +
+            '  branch first (git push), then re-run; or --force.',
+        );
+    }
 }
 
 if (!existsSync(NOTES)) {
@@ -234,6 +260,15 @@ function lastTag() {
 
 function git(args) {
     return execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+}
+
+/** Commits on HEAD that its upstream lacks, or `null` where the branch has no upstream. */
+function commitsAheadOfUpstream() {
+    try {
+        return Number(execFileSync('git', ['rev-list', '--count', '@{u}..HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+    } catch {
+        return null;
+    }
 }
 
 function fail(message) {

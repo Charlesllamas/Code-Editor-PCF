@@ -436,4 +436,59 @@ async function shoot(recipes, options = {}) {
     return failed;
 }
 
-module.exports = { findChrome, launch, shoot, sleep };
+/*
+ * Real mouse input — the mouse half of what `dev/keys.js` does for keys. A
+ * press through the protocol runs the browser's hit-testing, pointer capture
+ * and click synthesis, none of which `dispatchEvent` does: `pcf-calendar-view`'s
+ * `dev/clicks.js` found two defects only that way.
+ *
+ *     const { launch, click, drag } = require('./cdp');
+ *     await click(chrome, { x: 120, y: 80 });
+ *     await drag(chrome, { x: 300, y: 200 }, { x: 360, y: 200 });
+ *
+ * Coordinates are the page's, in CSS pixels: an element inside the hub's demo
+ * frame is at its own box plus the frame's.
+ *
+ * **`button` on every move, not only `buttons`.** A `mouseMoved` with
+ * `buttons: 1` and no `button` is a hover to Chrome: the pointer capture a
+ * control took on the press is dropped before the first move, and only a target
+ * that stays under the pointer goes on receiving moves — a narrow bar the
+ * pointer outruns stops dead, and the check blames the control (measured
+ * 2026-10-27 on a 16px timeline bar).
+ */
+function mouse(chrome, type, at, buttons) {
+    return chrome.send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', buttons, clickCount: 1, pointerType: 'mouse' });
+}
+
+/** Hover to `at`, as a hand arrives, so enter and over fire first. */
+function hover(chrome, at) {
+    return chrome.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y, button: 'none', buttons: 0, pointerType: 'mouse' });
+}
+
+/** A press and release at `at`; `settle` ms afterwards for what it set off. */
+async function click(chrome, at, { settle = 300 } = {}) {
+    await hover(chrome, at);
+    await sleep(120);
+    await mouse(chrome, 'mousePressed', at, 1);
+    await sleep(60);
+    await mouse(chrome, 'mouseReleased', at, 0);
+    await sleep(settle);
+}
+
+/** A press at `from`, `steps` even moves to `to` with the button held, and the release there. */
+async function drag(chrome, from, to, { steps = 6, pause = 40, settle = 600 } = {}) {
+    await hover(chrome, from);
+    await sleep(120);
+    await mouse(chrome, 'mousePressed', from, 1);
+
+    for (let step = 1; step <= steps; step += 1) {
+        await mouse(chrome, 'mouseMoved', { x: from.x + ((to.x - from.x) * step) / steps, y: from.y + ((to.y - from.y) * step) / steps }, 1);
+        await sleep(pause);
+    }
+
+    await sleep(60);
+    await mouse(chrome, 'mouseReleased', to, 0);
+    await sleep(settle);
+}
+
+module.exports = { click, drag, findChrome, launch, shoot, sleep };
