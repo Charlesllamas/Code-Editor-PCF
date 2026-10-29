@@ -94,7 +94,20 @@ const server = http.createServer((request, response) => {
      * The guard below is the second line rather than the first.
      */
     const url = new URL(request.url, 'http://localhost');
-    const requested = url.pathname === '/' ? pagePath : url.pathname;
+
+    /*
+     * The root redirects rather than serving the page in place. Served at `/`,
+     * the page's relative `<script src="host.js">` resolves to `/host.js` and
+     * every one of them 404s — an empty control, which is what a preview pane
+     * opening `http://localhost:<port>` showed on 2026-10-29.
+     */
+    if (url.pathname === '/') {
+        response.writeHead(302, { Location: pagePath + url.search }).end();
+
+        return;
+    }
+
+    const requested = url.pathname;
     const file = path.join(root, decodeURIComponent(requested));
 
     /*
