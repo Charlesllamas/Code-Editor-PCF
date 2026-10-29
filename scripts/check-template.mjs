@@ -1203,7 +1203,8 @@ if (!ignoresNotes) {
  * A warning, because a name is a guess: `disabled={loading}` on a button the
  * user did *not* just press is fine.
  */
-const SELF_DISABLING = /\bdisabled\s*=\s*\{\s*(?:!\s*)?(?:[\w$]+\.)*(busy|loading|adding|working|pending|saving|running|submitting|inFlight)\b/g;
+// Not after a hyphen: `aria-disabled={busy}` is the fix, not the fault.
+const SELF_DISABLING = /(?<![\w-])disabled\s*=\s*\{\s*(?:!\s*)?(?:[\w$]+\.)*(busy|loading|adding|working|pending|saving|running|submitting|inFlight)\b/g;
 
 for (const dir of controlDirs) {
     for (const path of walk(dir === '.' ? root : join(root, dir))) {
