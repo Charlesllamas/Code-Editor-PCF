@@ -3,6 +3,12 @@
  *
  *     npm run build && npm run harness
  *
+ * A repository with no harness but a `dev/preview.html` — the capture page
+ * pcf-data-table and pcf-kanban-board render their pictures from — gets that
+ * page instead. Both had kept a narrower copy of this file to serve it, each
+ * calling itself "a gap rather than a decision" until the template did; one
+ * file for both pages is the template doing it.
+ *
  * **Why this exists when the harness is a plain HTML file.** Opening it over
  * `file://` mostly works and then stops: `fetch` of a `demo/*.json` fixture is
  * blocked as a cross-origin request to a `null` origin, and any module script
@@ -28,21 +34,31 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const root = path.join(__dirname, '..');
-const page = path.join(__dirname, 'harness.html');
+
+/*
+ * The harness when there is one, the capture page when there is only that.
+ * The harness wins because it is the interactive one, and a repository that
+ * has both opens `preview.html` by its path.
+ */
+const page = ['harness.html', 'preview.html']
+    .map((name) => path.join(__dirname, name))
+    .find((candidate) => fs.existsSync(candidate));
 
 /*
  * Every shape scaffolds a harness page, so a missing one means somebody removed
  * it. Say that rather than serving a 404 the browser explains badly.
  */
-if (!fs.existsSync(page)) {
+if (page === undefined) {
     console.error(
-        '\n  No dev/harness.html in this repository.\n\n'
+        '\n  No dev/harness.html (or dev/preview.html) in this repository.\n\n'
         + '  Every shape ships one, so this repository dropped it. `npm start` and\n'
         + '  `npm run smoke` both still work; restore the page from the template if\n'
         + '  you want the switches back.\n',
     );
     process.exit(1);
 }
+
+const pagePath = `/dev/${path.basename(page)}`;
 
 const TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -78,7 +94,7 @@ const server = http.createServer((request, response) => {
      * The guard below is the second line rather than the first.
      */
     const url = new URL(request.url, 'http://localhost');
-    const requested = url.pathname === '/' ? '/dev/harness.html' : url.pathname;
+    const requested = url.pathname === '/' ? pagePath : url.pathname;
     const file = path.join(root, decodeURIComponent(requested));
 
     /*
@@ -139,9 +155,9 @@ server.on('error', (error) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
-    const url = `http://localhost:${port}/dev/harness.html`;
+    const url = `http://localhost:${port}${pagePath}`;
 
-    console.log(`\n  Harness on ${url}`);
+    console.log(`\n  ${pagePath.endsWith('harness.html') ? 'Harness' : 'Preview'} on ${url}`);
     console.log('  Rebuild with `npm run build`, then reload. Ctrl+C to stop.\n');
 
     if (shouldOpen) {

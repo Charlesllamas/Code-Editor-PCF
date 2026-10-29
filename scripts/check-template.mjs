@@ -1168,6 +1168,64 @@ if (exists(controlsOut)) {
 }
 
 /*
+ * The release notes stay out of git.
+ *
+ * `npm run release -- --draft` writes `.release-notes.md` at the root, and the
+ * tag message is where those notes live. Committed, a stale copy reads as the
+ * current release's notes when it is the previous one's. The template ignores
+ * it; on 2026-10-29 nine repositories did not, because their `.gitignore`
+ * predated the release script and nothing compared the two. A problem rather
+ * than a warning: the fix is one line, and a committed notes file is not
+ * something a later release takes back out.
+ */
+const gitignore = join(root, '.gitignore');
+const ignoresNotes = exists(gitignore)
+    && readFileSync(gitignore, 'utf8').split(/\r?\n/).some((line) => /^\/?\.release-notes\.md\s*$/.test(line.trim()));
+
+if (!ignoresNotes) {
+    problems.push(
+        '.gitignore does not ignore /.release-notes.md, which `npm run release -- --draft` writes at the root. '
+        + 'Copy the four lines under "release notes" from the template\'s .gitignore.',
+    );
+}
+
+/*
+ * A button that disables itself while its own work runs.
+ *
+ * A focused element that becomes `disabled` is blurred and focus goes to
+ * `BODY`; enabling it again gives nothing back, so a keyboard user who pressed
+ * Enter starts again from the top of the page (measured on the account form,
+ * pcf-form-action-button 0.2.0, 2026-10-28). The suite cannot see it — its DOM
+ * does not blur — and on 2026-10-29 three more controls carried it. While it
+ * works, the button wants `aria-disabled` (Fluent: `disabledFocusable`) and a
+ * press refused by state.
+ *
+ * A warning, because a name is a guess: `disabled={loading}` on a button the
+ * user did *not* just press is fine.
+ */
+const SELF_DISABLING = /\bdisabled\s*=\s*\{\s*(?:!\s*)?(?:[\w$]+\.)*(busy|loading|adding|working|pending|saving|running|submitting|inFlight)\b/g;
+
+for (const dir of controlDirs) {
+    for (const path of walk(dir === '.' ? root : join(root, dir))) {
+        if (!/\.tsx?$/.test(path)) {
+            continue;
+        }
+
+        const text = readFileSync(path, 'utf8');
+
+        for (const match of text.matchAll(SELF_DISABLING)) {
+            const line = text.slice(0, match.index).split('\n').length;
+
+            warnings.push(
+                `${path.slice(root.length + 1).replace(/\\/g, '/')}:${line} sets disabled={${match[1]}…}. If this is `
+                + 'the button the user just pressed, focus falls to BODY while it works — use aria-disabled '
+                + '(Fluent: disabledFocusable) and refuse the press by state.',
+            );
+        }
+    }
+}
+
+/*
  * Whether this file — and the rest of the shared tooling — is behind the
  * template. A stale copy of these checks is the one thing a green run here
  * cannot report on its own, because it *is* the checks: on 2026-10-08, 25 of
